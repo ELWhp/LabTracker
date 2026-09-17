@@ -5,6 +5,7 @@ import type {
   LabTest,
   UnitAllocation,
 } from './types/labTracker';
+import type { HistoryVersion } from './types/history';
 import {
   createInitialMockData,
   generateCalendarDays,
@@ -17,6 +18,7 @@ import { MonitoringTable } from './components/MonitoringTable';
 import { AddTestModal } from './components/AddTestModal';
 import { LabConfigModal } from './components/LabConfigModal';
 import { SidePanel } from './components/SidePanel';
+import { VersionHistoryModal } from './components/VersionHistoryModal';
 import {
   Plus,
   Settings,
@@ -25,6 +27,9 @@ import {
   RotateCcw,
   FlaskConical,
   HelpCircle,
+  Save,
+  History,
+  AlertTriangle,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -49,6 +54,13 @@ export function App() {
     return saved ? JSON.parse(saved) : createInitialMockData().tests;
   });
 
+  // Unsaved changes state flag & version history list
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [historyVersions, setHistoryVersions] = useState<HistoryVersion[]>(() => {
+    const saved = localStorage.getItem('labtracker_history_versions');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [startDateStr, setStartDateStr] = useState<string>(() => {
     const today = new Date();
     const y = today.getFullYear();
@@ -61,23 +73,25 @@ export function App() {
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedAllocationId, setSelectedAllocationId] = useState<string | null>(null);
 
+  // Prompt before navigating away with unsaved changes
   useEffect(() => {
-    localStorage.setItem('labtracker_labs', JSON.stringify(labs));
-  }, [labs]);
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
+  // Persistence for history versions
   useEffect(() => {
-    localStorage.setItem('labtracker_stations', JSON.stringify(stations));
-  }, [stations]);
-
-  useEffect(() => {
-    localStorage.setItem('labtracker_resources', JSON.stringify(resources));
-  }, [resources]);
-
-  useEffect(() => {
-    localStorage.setItem('labtracker_tests', JSON.stringify(tests));
-  }, [tests]);
+    localStorage.setItem('labtracker_history_versions', JSON.stringify(historyVersions));
+  }, [historyVersions]);
 
   const calendarDays = generateCalendarDays(startDateStr, daysCount);
   const resourceIssues = evaluateResourceAllocations(tests, resources, calendarDays);
@@ -96,8 +110,38 @@ export function App() {
     }
   }
 
+  // Save current state explicitly to localStorage and append a version history snapshot
+  const handleSaveChanges = () => {
+    localStorage.setItem('labtracker_labs', JSON.stringify(labs));
+    localStorage.setItem('labtracker_stations', JSON.stringify(stations));
+    localStorage.setItem('labtracker_resources', JSON.stringify(resources));
+    localStorage.setItem('labtracker_tests', JSON.stringify(tests));
+
+    const newVer: HistoryVersion = {
+      id: `ver-${Date.now()}`,
+      timestamp: new Date().toLocaleString(),
+      savedBy: 'Team Member',
+      note: 'Manual saved schedule revision',
+      data: { labs, stations, resources, tests },
+    };
+
+    setHistoryVersions([newVer, ...historyVersions]);
+    setHasUnsavedChanges(false);
+  };
+
+  const handleRestoreVersion = (version: HistoryVersion) => {
+    if (version.data) {
+      setLabs(version.data.labs || labs);
+      setStations(version.data.stations || stations);
+      setResources(version.data.resources || resources);
+      setTests(version.data.tests || tests);
+      setHasUnsavedChanges(true);
+    }
+  };
+
   const handleAddTest = (newTest: LabTest) => {
     setTests([...tests, newTest]);
+    setHasUnsavedChanges(true);
   };
 
   const handleUpdateTest = (updatedTest: LabTest) => {
@@ -144,6 +188,7 @@ export function App() {
         };
       })
     );
+    setHasUnsavedChanges(true);
   };
 
   const handleDeleteTest = (testId: string) => {
@@ -152,6 +197,7 @@ export function App() {
       if (selectedTest?.id === testId) {
         setSelectedAllocationId(null);
       }
+      setHasUnsavedChanges(true);
     }
   };
 
@@ -180,6 +226,7 @@ export function App() {
         return { ...t, unitAllocations: updatedAllocations };
       })
     );
+    setHasUnsavedChanges(true);
   };
 
   const handleUpdateSingleAllocation = (updatedAllocation: UnitAllocation) => {
@@ -192,6 +239,7 @@ export function App() {
         return { ...t, unitAllocations: updatedAllocations };
       })
     );
+    setHasUnsavedChanges(true);
   };
 
   const handleResetData = () => {
@@ -202,6 +250,7 @@ export function App() {
       setResources(initial.resources);
       setTests(initial.tests);
       setSelectedAllocationId(null);
+      setHasUnsavedChanges(true);
     }
   };
 
@@ -218,6 +267,7 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
+      {/* Navbar Header */}
       <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -233,6 +283,24 @@ export function App() {
           </div>
 
           <div className="flex items-center space-x-2">
+            <button
+              onClick={handleSaveChanges}
+              className={`px-3.5 py-2 font-semibold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer ${
+                hasUnsavedChanges
+                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold animate-pulse'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+              }`}
+            >
+              <Save className="h-4 w-4" /> Save Changes
+            </button>
+
+            <button
+              onClick={() => setIsHistoryModalOpen(true)}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <History className="h-4 w-4 text-blue-400" /> Version History
+            </button>
+
             <button
               onClick={() => setIsAddModalOpen(true)}
               className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -264,11 +332,30 @@ export function App() {
             </button>
           </div>
         </div>
+
+        {/* Top Warning Banner for Unsaved Changes */}
+        {hasUnsavedChanges && (
+          <div className="bg-amber-400 text-amber-950 text-xs font-semibold px-4 py-2 flex items-center justify-between border-t border-amber-500">
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-950 shrink-0" />
+              You have unsaved changes! If you exit or reload without saving, your changes will be lost.
+            </span>
+            <button
+              onClick={handleSaveChanges}
+              className="bg-amber-950 text-white px-2.5 py-1 rounded text-[11px] hover:bg-amber-900 font-bold cursor-pointer"
+            >
+              Save Now
+            </button>
+          </div>
+        )}
       </header>
 
+      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 space-y-4">
+        {/* Upper-Middle Resource Allocation Notification Banner */}
         <ResourceAlertBanner issues={resourceIssues} />
 
+        {/* Timeline Control Bar */}
         <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-xs flex items-center justify-between text-xs">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
@@ -303,6 +390,7 @@ export function App() {
           </div>
         </div>
 
+        {/* Schedule Grid Table */}
         <ScheduleGrid
           labs={labs}
           stations={stations}
@@ -313,6 +401,7 @@ export function App() {
           onUpdateAllocationDates={handleUpdateAllocationDates}
         />
 
+        {/* Monitoring Table */}
         <MonitoringTable
           tests={tests}
           onUpdateTest={handleUpdateTest}
@@ -320,6 +409,7 @@ export function App() {
         />
       </main>
 
+      {/* Hideable Right Side Panel */}
       <SidePanel
         isOpen={selectedAllocationId !== null}
         onClose={() => setSelectedAllocationId(null)}
@@ -330,6 +420,7 @@ export function App() {
         onUpdateAllocation={handleUpdateSingleAllocation}
       />
 
+      {/* Modals */}
       <AddTestModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -348,8 +439,19 @@ export function App() {
         onUpdateLabsAndStations={(l: Lab[], s: Station[]) => {
           setLabs(l);
           setStations(s);
+          setHasUnsavedChanges(true);
         }}
-        onUpdateResources={setResources}
+        onUpdateResources={(r) => {
+          setResources(r);
+          setHasUnsavedChanges(true);
+        }}
+      />
+
+      <VersionHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        versions={historyVersions}
+        onRestoreVersion={handleRestoreVersion}
       />
     </div>
   );
