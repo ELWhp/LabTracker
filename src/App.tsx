@@ -4,6 +4,7 @@ import type {
   PersonnelResource,
   LabTest,
   UnitAllocation,
+  TestTypeConfig,
 } from './types/labTracker';
 import type { HistoryVersion } from './types/history';
 import {
@@ -11,6 +12,7 @@ import {
   generateCalendarDays,
   evaluateResourceAllocations,
   addWorkingDays,
+  calculateWorkingDaysBetween,
 } from './utils/labTrackerUtils';
 import { ScheduleGrid } from './components/ScheduleGrid';
 import { ResourceAlertBanner } from './components/ResourceAlertBanner';
@@ -19,21 +21,33 @@ import { AddTestModal } from './components/AddTestModal';
 import { LabConfigModal } from './components/LabConfigModal';
 import { SidePanel } from './components/SidePanel';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
+import { TechWorkloadView } from './components/TechWorkloadView';
+import { DataExportModal } from './components/DataExportModal';
+import { UserGuide } from './components/UserGuide';
 import {
   Plus,
   Settings,
   Calendar as CalendarIcon,
   Download,
-  RotateCcw,
   FlaskConical,
   HelpCircle,
   Save,
   History,
   AlertTriangle,
+  Users,
+  LayoutGrid,
+  BookOpen,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export function App() {
+  const [activeTab, setActiveTab] = useState<'labs' | 'techs'>('labs');
+
+  const [testTypes, setTestTypes] = useState<TestTypeConfig[]>(() => {
+    const saved = localStorage.getItem('labtracker_test_types');
+    return saved ? JSON.parse(saved) : createInitialMockData().testTypes;
+  });
+
   const [labs, setLabs] = useState<Lab[]>(() => {
     const saved = localStorage.getItem('labtracker_labs');
     return saved ? JSON.parse(saved) : createInitialMockData().labs;
@@ -54,7 +68,8 @@ export function App() {
     return saved ? JSON.parse(saved) : createInitialMockData().tests;
   });
 
-  // Unsaved changes state flag & version history list
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('user@labcompany.com');
+
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [historyVersions, setHistoryVersions] = useState<HistoryVersion[]>(() => {
     const saved = localStorage.getItem('labtracker_history_versions');
@@ -72,11 +87,15 @@ export function App() {
   const [daysCount, setDaysCount] = useState<number>(30);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [prefilledStationId, setPrefilledStationId] = useState<string | undefined>(undefined);
+  const [prefilledStartDate, setPrefilledStartDate] = useState<string | undefined>(undefined);
+
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [selectedAllocationId, setSelectedAllocationId] = useState<string | null>(null);
 
-  // Prompt before navigating away with unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
@@ -88,13 +107,16 @@ export function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // Persistence for history versions
   useEffect(() => {
     localStorage.setItem('labtracker_history_versions', JSON.stringify(historyVersions));
   }, [historyVersions]);
 
+  useEffect(() => {
+    localStorage.setItem('labtracker_test_types', JSON.stringify(testTypes));
+  }, [testTypes]);
+
   const calendarDays = generateCalendarDays(startDateStr, daysCount);
-  const resourceIssues = evaluateResourceAllocations(tests, resources, calendarDays);
+  const resourceIssues = evaluateResourceAllocations(tests, resources, calendarDays, testTypes);
 
   let selectedAllocation: UnitAllocation | null = null;
   let selectedTest: LabTest | null = null;
@@ -110,17 +132,17 @@ export function App() {
     }
   }
 
-  // Save current state explicitly to localStorage and append a version history snapshot
   const handleSaveChanges = () => {
     localStorage.setItem('labtracker_labs', JSON.stringify(labs));
     localStorage.setItem('labtracker_stations', JSON.stringify(stations));
     localStorage.setItem('labtracker_resources', JSON.stringify(resources));
     localStorage.setItem('labtracker_tests', JSON.stringify(tests));
+    localStorage.setItem('labtracker_test_types', JSON.stringify(testTypes));
 
     const newVer: HistoryVersion = {
       id: `ver-${Date.now()}`,
       timestamp: new Date().toLocaleString(),
-      savedBy: 'Team Member',
+      savedBy: currentUserEmail,
       note: 'Manual saved schedule revision',
       data: { labs, stations, resources, tests },
     };
@@ -152,7 +174,9 @@ export function App() {
         let updatedAllocations = t.unitAllocations;
 
         if (updatedTest.units !== t.units) {
-          const matchingLabs = labs.filter((l) => l.type === updatedTest.labType);
+          const matchingLabs = labs.filter((l) =>
+            l.type === updatedTest.labType || (l.supportedTestTypes && l.supportedTestTypes.includes(updatedTest.labType))
+          );
           const matchingStations = stations.filter((s) => matchingLabs.some((l) => l.id === s.labId));
 
           if (updatedTest.units < t.units) {
@@ -182,9 +206,19 @@ export function App() {
           totalUnits: updatedTest.units,
         }));
 
+        const changeDetail = `Updated test details by ${currentUserEmail}`;
+        const newLog = {
+          timestamp: new Date().toLocaleString(),
+          updatedBy: currentUserEmail,
+          details: changeDetail,
+        };
+
+        const editHistory = [...(t.editHistory || []), newLog];
+
         return {
           ...updatedTest,
           unitAllocations: updatedAllocations,
+          editHistory,
         };
       })
     );
@@ -223,7 +257,66 @@ export function App() {
           };
         });
 
-        return { ...t, unitAllocations: updatedAllocations };
+        const newLog = {
+          timestamp: new Date().toLocaleString(),
+          updatedBy: currentUserEmail,
+          details: `Rescheduled unit dates to ${newStartDate}`,
+        };
+
+        return {
+          ...t,
+          unitAllocations: updatedAllocations,
+          editHistory: [...(t.editHistory || []), newLog],
+        };
+      })
+    );
+    setHasUnsavedChanges(true);
+  };
+
+  const handleResizeAllocation = (
+    allocationId: string,
+    edge: 'start' | 'end',
+    newDateStr: string
+  ) => {
+    setTests(
+      tests.map((t) => {
+        const targetAlloc = t.unitAllocations.find((a) => a.id === allocationId);
+        if (!targetAlloc) return t;
+
+        let newStartDate = targetAlloc.startDate;
+        let newEndDate = targetAlloc.endDate;
+
+        if (edge === 'start') {
+          if (newDateStr <= targetAlloc.endDate) {
+            newStartDate = newDateStr;
+          }
+        } else {
+          if (newDateStr >= targetAlloc.startDate) {
+            newEndDate = newDateStr;
+          }
+        }
+
+        const newDuration = calculateWorkingDaysBetween(newStartDate, newEndDate);
+
+        const updatedAllocations = t.unitAllocations.map((a) => ({
+          ...a,
+          startDate: newStartDate,
+          endDate: newEndDate,
+        }));
+
+        const newLog = {
+          timestamp: new Date().toLocaleString(),
+          updatedBy: currentUserEmail,
+          details: `Resized test duration to ${newDuration} working days (${newStartDate} - ${newEndDate})`,
+        };
+
+        return {
+          ...t,
+          durationDays: newDuration,
+          startDate: newStartDate,
+          unitAllocations: updatedAllocations,
+          editHistory: [...(t.editHistory || []), newLog],
+        };
       })
     );
     setHasUnsavedChanges(true);
@@ -242,27 +335,10 @@ export function App() {
     setHasUnsavedChanges(true);
   };
 
-  const handleResetData = () => {
-    if (confirm('Reset all labs, stations, resources, and tests to initial mock defaults?')) {
-      const initial = createInitialMockData();
-      setLabs(initial.labs);
-      setStations(initial.stations);
-      setResources(initial.resources);
-      setTests(initial.tests);
-      setSelectedAllocationId(null);
-      setHasUnsavedChanges(true);
-    }
-  };
-
-  const handleExportDriveScript = () => {
-    const codeGs = `function doGet(e) {\n  return HtmlService.createTemplateFromFile('Index').evaluate().setTitle('Lab Tracker');\n}`;
-    const blob = new Blob([codeGs], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'Code.gs';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDoubleClickCell = (stationId: string, dateStr: string) => {
+    setPrefilledStationId(stationId);
+    setPrefilledStartDate(dateStr);
+    setIsAddModalOpen(true);
   };
 
   return (
@@ -277,12 +353,24 @@ export function App() {
             <div>
               <h1 className="text-lg font-bold tracking-tight">Lab Tracker & Resource Manager</h1>
               <p className="text-xs text-slate-400">
-                Multi-station scheduling with daily timeline & resource capacity constraint tracking
+                Multi-station timeline, station notes/capabilities, technician capacity & test edit history
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
+            <div className="hidden md:flex items-center gap-1.5 mr-2 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 text-xs">
+              <Users className="h-3.5 w-3.5 text-blue-400" />
+              <span className="text-slate-400 text-[11px]">User:</span>
+              <input
+                type="text"
+                value={currentUserEmail}
+                onChange={(e) => setCurrentUserEmail(e.target.value)}
+                className="bg-transparent text-white font-mono text-xs focus:outline-none w-36"
+                title="Current active user for edit audit logging & owner notices"
+              />
+            </div>
+
             <button
               onClick={handleSaveChanges}
               className={`px-3.5 py-2 font-semibold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer ${
@@ -302,7 +390,11 @@ export function App() {
             </button>
 
             <button
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => {
+                setPrefilledStationId(undefined);
+                setPrefilledStartDate(undefined);
+                setIsAddModalOpen(true);
+              }}
               className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Plus className="h-4 w-4" /> Add Test
@@ -316,19 +408,48 @@ export function App() {
             </button>
 
             <button
-              onClick={handleExportDriveScript}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700 flex items-center gap-1 transition-colors cursor-pointer"
-              title="Export Apps Script (Code.gs)"
+              onClick={() => setIsExportModalOpen(true)}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Export Database Tables (Tests, Labs, Techs, Stations)"
             >
-              <Download className="h-3.5 w-3.5 text-slate-400" /> Drive Script Export
+              <Download className="h-4 w-4 text-emerald-400" /> Export Tables
             </button>
 
             <button
-              onClick={handleResetData}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-              title="Reset Mock Data"
+              onClick={() => setIsGuideOpen(true)}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-blue-400 text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 font-semibold transition-colors cursor-pointer"
+              title="Open End User Guide"
             >
-              <RotateCcw className="h-4 w-4" />
+              <BookOpen className="h-4 w-4 text-blue-400" /> User Guide
+            </button>
+          </div>
+        </div>
+
+        {/* Top Navigation Tabs: Labs vs Techs */}
+        <div className="bg-slate-800 px-4 border-t border-slate-700 flex items-center justify-between">
+          <div className="flex space-x-1">
+            <button
+              onClick={() => setActiveTab('labs')}
+              className={`px-4 py-2 font-semibold text-xs flex items-center gap-2 border-b-2 transition-colors cursor-pointer ${
+                activeTab === 'labs'
+                  ? 'border-blue-500 text-white bg-slate-700/50'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <LayoutGrid className="h-4 w-4 text-blue-400" />
+              Labs View (Schedule Grid)
+            </button>
+
+            <button
+              onClick={() => setActiveTab('techs')}
+              className={`px-4 py-2 font-semibold text-xs flex items-center gap-2 border-b-2 transition-colors cursor-pointer ${
+                activeTab === 'techs'
+                  ? 'border-blue-500 text-white bg-slate-700/50'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Users className="h-4 w-4 text-emerald-400" />
+              Techs Workload View
             </button>
           </div>
         </div>
@@ -355,58 +476,77 @@ export function App() {
         {/* Upper-Middle Resource Allocation Notification Banner */}
         <ResourceAlertBanner issues={resourceIssues} />
 
-        {/* Timeline Control Bar */}
-        <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-xs flex items-center justify-between text-xs">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <CalendarIcon className="h-4 w-4 text-slate-500" />
-              <label className="font-semibold text-slate-700">Timeline Start Date:</label>
-              <input
-                type="date"
-                value={startDateStr}
-                onChange={(e) => setStartDateStr(e.target.value)}
-                className="px-2.5 py-1 border border-slate-300 rounded text-xs font-mono"
-              />
+        {activeTab === 'labs' ? (
+          <>
+            {/* Timeline Control Bar */}
+            <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-xs flex items-center justify-between text-xs">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4 text-slate-500" />
+                  <label className="font-semibold text-slate-700">Timeline Start Date:</label>
+                  <input
+                    type="date"
+                    value={startDateStr}
+                    onChange={(e) => setStartDateStr(e.target.value)}
+                    className="px-2.5 py-1 border border-slate-300 rounded text-xs font-mono"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="font-semibold text-slate-700">Days to View (Multi-Year):</label>
+                  <select
+                    value={daysCount}
+                    onChange={(e) => setDaysCount(parseInt(e.target.value) || 30)}
+                    className="px-2.5 py-1 border border-slate-300 rounded text-xs bg-white font-mono"
+                  >
+                    <option value={14}>14 Days (2 Weeks)</option>
+                    <option value={30}>30 Days (1 Month)</option>
+                    <option value={60}>60 Days (2 Months)</option>
+                    <option value={90}>90 Days (Quarter)</option>
+                    <option value={180}>180 Days (6 Months)</option>
+                    <option value={365}>365 Days (1 Year)</option>
+                    <option value={730}>730 Days (2 Years)</option>
+                    <option value={1825}>1825 Days (5 Years)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="text-slate-500 italic flex items-center gap-1">
+                <HelpCircle className="h-3.5 w-3.5" />
+                Double-click date cell to add test. Drag ends of test block to extend/shrink duration!
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <label className="font-semibold text-slate-700">Days to View:</label>
-              <select
-                value={daysCount}
-                onChange={(e) => setDaysCount(parseInt(e.target.value) || 30)}
-                className="px-2.5 py-1 border border-slate-300 rounded text-xs bg-white font-mono"
-              >
-                <option value={14}>14 Days (2 Weeks)</option>
-                <option value={30}>30 Days (1 Month)</option>
-                <option value={60}>60 Days (2 Months)</option>
-                <option value={90}>90 Days (Quarter)</option>
-              </select>
-            </div>
-          </div>
+            {/* Schedule Grid Table */}
+            <ScheduleGrid
+              labs={labs}
+              stations={stations}
+              tests={tests}
+              calendarDays={calendarDays}
+              selectedAllocationId={selectedAllocationId}
+              onSelectAllocation={(alloc) => setSelectedAllocationId(alloc.id)}
+              onUpdateAllocationDates={handleUpdateAllocationDates}
+              onResizeAllocation={handleResizeAllocation}
+              onDoubleClickCell={handleDoubleClickCell}
+            />
 
-          <div className="text-slate-500 italic flex items-center gap-1">
-            <HelpCircle className="h-3.5 w-3.5" />
-            Drag unit blocks along station rows to reschedule dates. Collision detection prevents overlap.
-          </div>
-        </div>
-
-        {/* Schedule Grid Table */}
-        <ScheduleGrid
-          labs={labs}
-          stations={stations}
-          tests={tests}
-          calendarDays={calendarDays}
-          selectedAllocationId={selectedAllocationId}
-          onSelectAllocation={(alloc) => setSelectedAllocationId(alloc.id)}
-          onUpdateAllocationDates={handleUpdateAllocationDates}
-        />
-
-        {/* Monitoring Table */}
-        <MonitoringTable
-          tests={tests}
-          onUpdateTest={handleUpdateTest}
-          onDeleteTest={handleDeleteTest}
-        />
+            {/* Monitoring Table */}
+            <MonitoringTable
+              tests={tests}
+              testTypes={testTypes}
+              calendarDays={calendarDays}
+              onUpdateTest={handleUpdateTest}
+              onDeleteTest={handleDeleteTest}
+            />
+          </>
+        ) : (
+          <TechWorkloadView
+            resources={resources}
+            tests={tests}
+            calendarDays={calendarDays}
+            testTypes={testTypes}
+          />
+        )}
       </main>
 
       {/* Hideable Right Side Panel */}
@@ -423,10 +563,17 @@ export function App() {
       {/* Modals */}
       <AddTestModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setPrefilledStationId(undefined);
+          setPrefilledStartDate(undefined);
+        }}
         labs={labs}
         stations={stations}
-        defaultStartDate={startDateStr}
+        testTypes={testTypes}
+        defaultStartDate={prefilledStartDate || startDateStr}
+        prefilledStationId={prefilledStationId}
+        currentUserEmail={currentUserEmail}
         onAddTest={handleAddTest}
       />
 
@@ -436,6 +583,7 @@ export function App() {
         labs={labs}
         stations={stations}
         resources={resources}
+        testTypes={testTypes}
         onUpdateLabsAndStations={(l: Lab[], s: Station[]) => {
           setLabs(l);
           setStations(s);
@@ -445,6 +593,10 @@ export function App() {
           setResources(r);
           setHasUnsavedChanges(true);
         }}
+        onUpdateTestTypes={(tt) => {
+          setTestTypes(tt);
+          setHasUnsavedChanges(true);
+        }}
       />
 
       <VersionHistoryModal
@@ -452,6 +604,21 @@ export function App() {
         onClose={() => setIsHistoryModalOpen(false)}
         versions={historyVersions}
         onRestoreVersion={handleRestoreVersion}
+      />
+
+      <DataExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        labs={labs}
+        stations={stations}
+        resources={resources}
+        tests={tests}
+        testTypes={testTypes}
+      />
+
+      <UserGuide
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
       />
     </div>
   );

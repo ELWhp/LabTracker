@@ -1,4 +1,13 @@
-import type { Lab, Station, PersonnelResource, LabTest, CalendarDay, ResourceIssue, LabType } from '../types/labTracker';
+import type {
+  Lab,
+  Station,
+  PersonnelResource,
+  LabTest,
+  CalendarDay,
+  ResourceIssue,
+  TestTypeConfig,
+} from '../types/labTracker';
+import { DEFAULT_TEST_TYPES } from '../types/labTracker';
 
 export function formatYYYYMMDD(date: Date): string {
   const y = date.getFullYear();
@@ -30,6 +39,36 @@ export function addWorkingDays(startDateStr: string, durationWorkingDays: number
   return formatYYYYMMDD(curr);
 }
 
+export function calculateWorkingDaysBetween(startDateStr: string, endDateStr: string): number {
+  if (endDateStr < startDateStr) return 1;
+  let curr = parseYYYYMMDD(startDateStr);
+  const end = parseYYYYMMDD(endDateStr);
+  let count = 0;
+  while (curr <= end) {
+    if (curr.getDay() !== 0 && curr.getDay() !== 6) {
+      count++;
+    }
+    curr.setDate(curr.getDate() + 1);
+  }
+  return Math.max(1, count);
+}
+
+export function getRandomVibrantColor(): string {
+  const colors = [
+    '#2563eb', // Vibrant Blue
+    '#d97706', // Amber / Orange
+    '#059669', // Emerald
+    '#7c3aed', // Purple
+    '#db2777', // Pink
+    '#0284c7', // Sky Blue
+    '#ea580c', // Dark Orange
+    '#4f46e5', // Indigo
+    '#0891b2', // Cyan
+    '#be185d', // Rose
+  ];
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
 export function getWeekNumber(d: Date): number {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const dayNum = date.getUTCDay() || 7;
@@ -41,7 +80,7 @@ export function getWeekNumber(d: Date): number {
 export function generateCalendarDays(startDateStr: string, numDays: number): CalendarDay[] {
   const days: CalendarDay[] = [];
   const start = parseYYYYMMDD(startDateStr);
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   for (let i = 0; i < numDays; i++) {
     const d = new Date(start);
@@ -63,26 +102,135 @@ export function generateCalendarDays(startDateStr: string, numDays: number): Cal
 }
 
 export function createInitialMockData() {
+  const testTypes: TestTypeConfig[] = DEFAULT_TEST_TYPES;
+
   const labs: Lab[] = [
-    { id: 'lab-1', name: 'Washer Energy Lab A', type: 'washer_energy', stationCount: 3 },
-    { id: 'lab-2', name: 'Dryer Energy Lab B', type: 'dryer_energy', stationCount: 2 },
-    { id: 'lab-3', name: 'Washer Performance Lab C', type: 'washer_performance', stationCount: 2 },
-    { id: 'lab-4', name: 'Dryer Performance Lab D', type: 'dryer_performance', stationCount: 2 },
+    {
+      id: 'lab-1',
+      name: 'Washer Energy Lab A',
+      type: 'washer_energy',
+      stationCount: 3,
+      comments: 'Main washer energy testing facility with high pressure water lines.',
+      supportedTestTypes: ['washer_energy', 'washer_performance'],
+    },
+    {
+      id: 'lab-2',
+      name: 'Dryer Energy Lab B',
+      type: 'dryer_energy',
+      stationCount: 2,
+      comments: 'High heat venting chamber for energy compliance testing.',
+      supportedTestTypes: ['dryer_energy', 'dryer_performance'],
+    },
+    {
+      id: 'lab-3',
+      name: 'Washer Performance Lab C',
+      type: 'washer_performance',
+      stationCount: 2,
+      comments: 'Stain removal and load balance testing lab.',
+      supportedTestTypes: ['washer_performance'],
+    },
+    {
+      id: 'lab-4',
+      name: 'Dryer Performance Lab D',
+      type: 'dryer_performance',
+      stationCount: 2,
+      comments: 'Moisture sensing and lint accumulation facility.',
+      supportedTestTypes: ['dryer_performance'],
+    },
   ];
 
   const stations: Station[] = [
-    { id: 'st-1-1', labId: 'lab-1', stationNumber: 1, notes: '220V High Flow Water Hookup' },
-    { id: 'st-1-2', labId: 'lab-1', stationNumber: 2, notes: 'Standard 120V Station' },
-    { id: 'st-1-3', labId: 'lab-1', stationNumber: 3, notes: 'Calibrated Water Meter Station' },
+    {
+      id: 'st-1-1',
+      labId: 'lab-1',
+      stationNumber: 1,
+      name: 'Station 1 - 220V Flow',
+      comments: 'Equipped with precision water flow meters and thermistor array.',
+      capabilities: [
+        { id: 'cap-1', name: 'Thermistor 1', comments: 'Calibrated temp probe (+/- 0.1C)' },
+        { id: 'cap-2', name: 'Scale', comments: 'High capacity 50kg digital scale' },
+      ],
+    },
+    {
+      id: 'st-1-2',
+      labId: 'lab-1',
+      stationNumber: 2,
+      name: 'Station 2 - 120V Standard',
+      comments: 'Standard 120V power supply hookup.',
+      capabilities: [
+        { id: 'cap-1', name: 'Thermistor 1', comments: 'Standard thermal sensor' },
+      ],
+    },
+    {
+      id: 'st-1-3',
+      labId: 'lab-1',
+      stationNumber: 3,
+      name: 'Station 3 - Calibrated Meter',
+      comments: 'Dedicated for high precision energy audits.',
+      capabilities: [
+        { id: 'cap-1', name: 'Thermistor 1', comments: 'Calibrated temp probe' },
+        { id: 'cap-3', name: 'Humidity Sensor', comments: 'Relative humidity probe' },
+      ],
+    },
 
-    { id: 'st-2-1', labId: 'lab-2', stationNumber: 1, notes: 'High Heat Vent Duct' },
-    { id: 'st-2-2', labId: 'lab-2', stationNumber: 2, notes: 'Condenser Unit Exhaust' },
+    {
+      id: 'st-2-1',
+      labId: 'lab-2',
+      stationNumber: 1,
+      name: 'Station 1 - Vent Duct',
+      comments: 'Insulated exhaust ducting.',
+      capabilities: [
+        { id: 'cap-3', name: 'Humidity Sensor', comments: 'Exhaust RH sensor' },
+      ],
+    },
+    {
+      id: 'st-2-2',
+      labId: 'lab-2',
+      stationNumber: 2,
+      name: 'Station 2 - Condenser Unit',
+      comments: 'Water drain exhaust line attached.',
+      capabilities: [
+        { id: 'cap-2', name: 'Scale', comments: 'Water condensation catch scale' },
+      ],
+    },
 
-    { id: 'st-3-1', labId: 'lab-3', stationNumber: 1, notes: 'Performance Stain Chamber 1' },
-    { id: 'st-3-2', labId: 'lab-3', stationNumber: 2, notes: 'Performance Stain Chamber 2' },
+    {
+      id: 'st-3-1',
+      labId: 'lab-3',
+      stationNumber: 1,
+      name: 'Station 1 - Stain Chamber',
+      comments: 'Standardized stain cloth analysis rig.',
+      capabilities: [],
+    },
+    {
+      id: 'st-3-2',
+      labId: 'lab-3',
+      stationNumber: 2,
+      name: 'Station 2 - Stain Chamber',
+      comments: 'Secondary stain chamber.',
+      capabilities: [],
+    },
 
-    { id: 'st-4-1', labId: 'lab-4', stationNumber: 1, notes: 'Lint & Moisture Sensor Station 1' },
-    { id: 'st-4-2', labId: 'lab-4', stationNumber: 2, notes: 'Lint & Moisture Sensor Station 2' },
+    {
+      id: 'st-4-1',
+      labId: 'lab-4',
+      stationNumber: 1,
+      name: 'Station 1 - Moisture Rig',
+      comments: 'Precision humidity telemetry.',
+      capabilities: [
+        { id: 'cap-3', name: 'Humidity Sensor', comments: 'Precision RH probe' },
+      ],
+    },
+    {
+      id: 'st-4-2',
+      labId: 'lab-4',
+      stationNumber: 2,
+      name: 'Station 2 - Lint Collector',
+      comments: 'Lint mass airflow measurement.',
+      capabilities: [
+        { id: 'cap-2', name: 'Scale', comments: '0.01g lint scale' },
+      ],
+    },
   ];
 
   const resources: PersonnelResource[] = [
@@ -115,10 +263,20 @@ export function createInitialMockData() {
       name: 'ENERGY STAR Washer Audit 2026',
       units: 3,
       durationDays: 12,
-      color: '#3b82f6',
+      color: '#2563eb',
       resourcesNeededTotal: 1,
       labType: 'washer_energy',
       startDate: baseDate,
+      testOwner: 'alice@labcompany.com',
+      vrNumber: 'VR-2026-001',
+      linkToVR: 'https://codebeamer.example.com/item/1001',
+      editHistory: [
+        {
+          timestamp: new Date().toLocaleString(),
+          updatedBy: 'alice@labcompany.com',
+          details: 'Created initial test schedule.',
+        },
+      ],
       unitAllocations: [
         {
           id: 'alloc-101-1',
@@ -154,10 +312,20 @@ export function createInitialMockData() {
       name: 'Dryer Heat Efficiency Cycle',
       units: 2,
       durationDays: 8,
-      color: '#f97316',
+      color: '#ea580c',
       resourcesNeededTotal: 2,
       labType: 'dryer_energy',
       startDate: addDays(baseDate, 2),
+      testOwner: 'charlie@labcompany.com',
+      vrNumber: 'VR-2026-008',
+      linkToVR: 'https://codebeamer.example.com/item/1008',
+      editHistory: [
+        {
+          timestamp: new Date().toLocaleString(),
+          updatedBy: 'charlie@labcompany.com',
+          details: 'Created test schedule.',
+        },
+      ],
       unitAllocations: [
         {
           id: 'alloc-102-1',
@@ -181,18 +349,19 @@ export function createInitialMockData() {
     },
   ];
 
-  return { labs, stations, resources, tests };
+  return { testTypes, labs, stations, resources, tests };
 }
 
 export function evaluateResourceAllocations(
   tests: LabTest[],
   resources: PersonnelResource[],
-  calendarDays: CalendarDay[]
+  calendarDays: CalendarDay[],
+  testTypes: TestTypeConfig[] = DEFAULT_TEST_TYPES
 ): ResourceIssue[] {
   const issues: ResourceIssue[] = [];
-  const labTypes: LabType[] = ['washer_energy', 'dryer_energy', 'washer_performance', 'dryer_performance'];
+  const typeKeys = testTypes.map((t) => t.id);
 
-  labTypes.forEach((labType) => {
+  typeKeys.forEach((labType) => {
     let currentConflictStart: string | null = null;
     let currentConflictEnd: string | null = null;
     let maxDemand = 0;

@@ -1,10 +1,11 @@
 /**
  * Lab Tracker & Resource Manager - Google Apps Script Backend (Code.gs)
  *
- * How shared team access and concurrency control work:
- * 1. Data Storage: Stores all lab schedule state in Script Properties and/or a attached Google Sheet.
+ * How shared team access, concurrency control & notifications work:
+ * 1. Data Storage: Stores all lab schedule state in Script Properties and/or an attached Google Sheet.
  * 2. Concurrency Lock: Uses LockService (LockService.getScriptLock()) to prevent race conditions when multiple team members edit at once.
  * 3. Version History: Appends timestamped version snapshots on each save for full audit trail & version restore.
+ * 4. Notifications: Uses MailApp.sendEmail to alert test owners when another team member modifies their scheduled tests.
  */
 
 function doGet(e) {
@@ -13,6 +14,26 @@ function doGet(e) {
     .setTitle('Lab Tracker & Resource Management')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Send email notification to test owner if modified by another user
+ */
+function sendTestModificationNotification(ownerEmail, testName, modifiedBy, changeSummary) {
+  if (!ownerEmail || ownerEmail.indexOf('@') === -1) return;
+  try {
+    var subject = 'Lab Tracker Alert: Test "' + testName + '" was modified';
+    var body = 'Hello,\n\n' +
+      'This is an automated notification from Lab Tracker.\n\n' +
+      'Your test "' + testName + '" was recently modified by ' + (modifiedBy || 'a team member') + '.\n' +
+      'Change summary: ' + (changeSummary || 'Test schedule updated') + '\n\n' +
+      'Timestamp: ' + new Date().toLocaleString() + '\n\n' +
+      'Please open the Lab Tracker app to view the updated schedule.';
+
+    MailApp.sendEmail(ownerEmail, subject, body);
+  } catch (err) {
+    Logger.log('Could not send notification email: ' + err.toString());
+  }
 }
 
 /**

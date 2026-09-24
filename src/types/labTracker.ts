@@ -1,24 +1,49 @@
-export type LabType = 'washer_energy' | 'dryer_energy' | 'washer_performance' | 'dryer_performance';
+export type LabType = string;
 
-export const LAB_TYPE_LABELS: Record<LabType, string> = {
+export interface TestTypeConfig {
+  id: string;
+  name: string;
+  label: string;
+  color: string;
+  description?: string;
+}
+
+export const DEFAULT_TEST_TYPES: TestTypeConfig[] = [
+  { id: 'washer_energy', name: 'washer_energy', label: 'Washer Energy', color: '#3b82f6' },
+  { id: 'dryer_energy', name: 'dryer_energy', label: 'Dryer Energy', color: '#f97316' },
+  { id: 'washer_performance', name: 'washer_performance', label: 'Washer Performance', color: '#10b981' },
+  { id: 'dryer_performance', name: 'dryer_performance', label: 'Dryer Performance', color: '#8b5cf6' },
+];
+
+export const LAB_TYPE_LABELS: Record<string, string> = {
   washer_energy: 'Washer Energy',
   dryer_energy: 'Dryer Energy',
   washer_performance: 'Washer Performance',
   dryer_performance: 'Dryer Performance',
 };
 
-export interface Lab {
+export interface StationCapability {
   id: string;
   name: string;
-  type: LabType;
-  stationCount: number;
+  comments?: string;
 }
 
 export interface Station {
   id: string;
   labId: string;
   stationNumber: number;
-  notes: string;
+  name: string; // Renamed from notes (Station Name)
+  comments?: string;
+  capabilities?: StationCapability[];
+}
+
+export interface Lab {
+  id: string;
+  name: string;
+  type: LabType;
+  stationCount: number;
+  comments?: string;
+  supportedTestTypes?: string[];
 }
 
 export interface PersonnelResource {
@@ -38,6 +63,12 @@ export interface UnitAllocation {
   endDate: string;
 }
 
+export interface TestEditLog {
+  timestamp: string;
+  updatedBy: string;
+  details: string;
+}
+
 export interface LabTest {
   id: string;
   name: string;
@@ -49,6 +80,10 @@ export interface LabTest {
   startDate: string;
   notes?: string;
   unitAllocations: UnitAllocation[];
+  testOwner?: string;
+  vrNumber?: string;
+  linkToVR?: string;
+  editHistory?: TestEditLog[];
 }
 
 export interface CalendarDay {

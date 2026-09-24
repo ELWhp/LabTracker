@@ -1,212 +1,256 @@
 import React, { useState } from 'react';
-import type { LabTest } from '../types/labTracker';
+import type { LabTest, TestTypeConfig, CalendarDay } from '../types/labTracker';
 import { LAB_TYPE_LABELS } from '../types/labTracker';
-import { Edit2, Trash2, Layers } from 'lucide-react';
+import { Trash2, Edit2, ExternalLink, User, FileCode, History } from 'lucide-react';
 
 interface MonitoringTableProps {
   tests: LabTest[];
+  testTypes?: TestTypeConfig[];
+  calendarDays?: CalendarDay[];
   onUpdateTest: (updatedTest: LabTest) => void;
   onDeleteTest: (testId: string) => void;
 }
 
 export const MonitoringTable: React.FC<MonitoringTableProps> = ({
   tests,
+  testTypes = [],
+  calendarDays = [],
   onUpdateTest,
   onDeleteTest,
 }) => {
   const [editingTestId, setEditingTestId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editUnits, setEditUnits] = useState(1);
-  const [editColor, setEditColor] = useState('#3b82f6');
-  const [editResources, setEditResources] = useState(1);
+  const [historyModalTest, setHistoryModalTest] = useState<LabTest | null>(null);
 
-  const startEditing = (test: LabTest) => {
-    setEditingTestId(test.id);
-    setEditName(test.name);
-    setEditUnits(test.units);
-    setEditColor(test.color);
-    setEditResources(test.resourcesNeededTotal);
-  };
-
-  const saveEditing = (test: LabTest) => {
-    if (!editName.trim()) return;
-
-    const minStart = test.unitAllocations.reduce(
-      (min, a) => (a.startDate < min ? a.startDate : min),
-      test.startDate
-    );
-
-    onUpdateTest({
-      ...test,
-      name: editName.trim(),
-      units: Math.max(1, editUnits),
-      color: editColor,
-      resourcesNeededTotal: Math.max(1, editResources),
-      startDate: minStart,
-    });
-    setEditingTestId(null);
-  };
+  const typeMap = new Map<string, string>(testTypes.map((tt) => [tt.id, tt.label]));
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 mb-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 space-y-3">
+      {/* Test Edit History Audit Log Modal */}
+      {historyModalTest && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-5 space-y-4 border border-slate-200">
+            <div className="flex items-center justify-between border-b pb-2">
+              <div className="flex items-center gap-2">
+                <History className="h-5 w-5 text-blue-600" />
+                <h3 className="font-bold text-slate-800 text-sm">
+                  Edit Audit Log: {historyModalTest.name}
+                </h3>
+              </div>
+              <button
+                onClick={() => setHistoryModalTest(null)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-xs"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {historyModalTest.editHistory && historyModalTest.editHistory.length > 0 ? (
+                historyModalTest.editHistory.map((log, idx) => (
+                  <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs space-y-1">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                      <span>User: {log.updatedBy}</span>
+                      <span>{log.timestamp}</span>
+                    </div>
+                    <p className="text-slate-800 font-medium">{log.details}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-slate-500 italic py-4 text-center">
+                  No previous edit history logged for this test.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
         <div>
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <Layers className="h-5 w-5 text-blue-600" />
-            Test Monitoring Table
-          </h3>
-          <p className="text-xs text-slate-500">
-            Overview of all ongoing and scheduled lab tests. Edits to Test Name or Amount of Units here automatically update the main lab schedule.
+          <h2 className="text-sm font-bold text-slate-800">Test Monitoring & Tracking Table</h2>
+          <p className="text-[11px] text-slate-500">
+            Real-time schedule parameters, VR numbers, test owners, chronogram timeline bars & edit audit logs
           </p>
         </div>
+        <span className="text-xs font-semibold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full border border-slate-200">
+          Total Scheduled Tests: {tests.length}
+        </span>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full text-xs text-left border-collapse">
+        <table className="min-w-full border-collapse text-xs">
           <thead>
-            <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
-              <th className="px-3 py-2">Color</th>
+            <tr className="bg-slate-100 text-slate-700 font-bold text-left border-b border-slate-300">
+              <th className="px-3 py-2 w-32">Chronogram</th>
               <th className="px-3 py-2">Test Name</th>
+              <th className="px-3 py-2">VR # & Link</th>
+              <th className="px-3 py-2">Owner / User</th>
               <th className="px-3 py-2">Lab Type</th>
-              <th className="px-3 py-2 text-center">Amount of Units</th>
-              <th className="px-3 py-2 text-center">Duration (Days)</th>
-              <th className="px-3 py-2 text-center">Resources Needed</th>
-              <th className="px-3 py-2">Start Date</th>
-              <th className="px-3 py-2">End Date</th>
-              <th className="px-3 py-2 text-right">Actions</th>
+              <th className="px-3 py-2 text-center">Units</th>
+              <th className="px-3 py-2 text-center">Duration</th>
+              <th className="px-3 py-2 text-center">Resources Req</th>
+              <th className="px-3 py-2 text-center">Start Date</th>
+              <th className="px-3 py-2 text-center">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200">
+          <tbody>
             {tests.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-3 py-6 text-center text-slate-400 italic">
-                  No tests created yet. Click "Add Test" above to configure a new test.
+                <td colSpan={10} className="px-3 py-6 text-center text-slate-400 italic">
+                  No tests scheduled yet. Click "+ Add Test" or double-click on the timeline grid to create one!
                 </td>
               </tr>
             ) : (
               tests.map((test) => {
                 const isEditing = editingTestId === test.id;
-                const minStartDate = test.unitAllocations.length > 0
-                  ? test.unitAllocations.reduce((min, a) => (a.startDate < min ? a.startDate : min), test.unitAllocations[0].startDate)
-                  : test.startDate;
-                const maxEndDate = test.unitAllocations.length > 0
-                  ? test.unitAllocations.reduce((max, a) => (a.endDate > max ? a.endDate : max), test.unitAllocations[0].endDate)
-                  : '-';
+
+                const totalCalDays = Math.max(1, calendarDays.length);
+                const testStartIndex = calendarDays.findIndex((d) => d.dateStr === test.startDate);
+                const testAlloc = test.unitAllocations[0];
+                const testEndDate = testAlloc ? testAlloc.endDate : test.startDate;
+                const testEndIndex = calendarDays.findIndex((d) => d.dateStr === testEndDate);
+
+                let leftPercent = 0;
+                let widthPercent = 100;
+
+                if (testStartIndex >= 0) {
+                  leftPercent = (testStartIndex / totalCalDays) * 100;
+                  const durationSpan = Math.max(1, (testEndIndex >= 0 ? testEndIndex : testStartIndex) - testStartIndex + 1);
+                  widthPercent = (durationSpan / totalCalDays) * 100;
+                }
 
                 return (
-                  <tr key={test.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={test.id} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
+                    {/* Visual Chronogram Column */}
                     <td className="px-3 py-2 align-middle">
-                      {isEditing ? (
-                        <input
-                          type="color"
-                          value={editColor}
-                          onChange={(e) => setEditColor(e.target.value)}
-                          className="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0"
-                        />
-                      ) : (
+                      <div className="w-full bg-slate-100 h-4 rounded-full overflow-hidden relative border border-slate-200" title={`Chronogram: ${test.startDate} to ${testEndDate}`}>
                         <div
-                          className="w-5 h-5 rounded border border-slate-300 shadow-xs"
-                          style={{ backgroundColor: test.color }}
-                          title={test.color}
+                          style={{
+                            marginLeft: `${leftPercent}%`,
+                            width: `${Math.min(100 - leftPercent, widthPercent)}%`,
+                            backgroundColor: test.color || '#2563eb',
+                          }}
+                          className="h-full rounded-full transition-all"
                         />
-                      )}
+                      </div>
+                      <div className="text-[9px] text-slate-400 font-mono mt-0.5 text-center">
+                        {test.startDate.slice(5)} - {testEndDate.slice(5)}
+                      </div>
                     </td>
 
-                    <td className="px-3 py-2 font-medium text-slate-800 align-middle">
+                    {/* Test Name */}
+                    <td className="px-3 py-2 font-semibold text-slate-800">
                       {isEditing ? (
                         <input
                           type="text"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          className="px-2 py-1 border border-slate-300 rounded text-xs w-full focus:ring-1 focus:ring-blue-500"
+                          value={test.name}
+                          onChange={(e) => onUpdateTest({ ...test, name: e.target.value })}
+                          className="px-2 py-1 border border-blue-400 rounded w-full font-sans text-xs focus:ring-1 focus:ring-blue-500"
                         />
                       ) : (
-                        test.name
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: test.color }} />
+                          <span>{test.name}</span>
+                        </div>
                       )}
                     </td>
 
-                    <td className="px-3 py-2 align-middle">
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[11px] font-medium border border-slate-200">
-                        {LAB_TYPE_LABELS[test.labType]}
-                      </span>
+                    {/* VR Number & Link */}
+                    <td className="px-3 py-2 font-mono text-[11px] text-slate-600">
+                      {test.vrNumber ? (
+                        <div className="flex items-center gap-1">
+                          <FileCode className="h-3 w-3 text-slate-400" />
+                          <span>{test.vrNumber}</span>
+                          {test.linkToVR && (
+                            <a
+                              href={test.linkToVR}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 hover:underline inline-flex items-center gap-0.5 ml-1"
+                              title="Open VR Link"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic">None</span>
+                      )}
                     </td>
 
-                    <td className="px-3 py-2 text-center font-bold text-slate-700 align-middle">
+                    {/* Test Owner */}
+                    <td className="px-3 py-2 text-slate-600">
+                      <div className="flex items-center gap-1">
+                        <User className="h-3 w-3 text-slate-400" />
+                        <span className="truncate max-w-[120px]">{test.testOwner || 'Unassigned'}</span>
+                      </div>
+                    </td>
+
+                    {/* Lab Type */}
+                    <td className="px-3 py-2 text-slate-600 font-medium">
+                      {typeMap.get(test.labType) || LAB_TYPE_LABELS[test.labType] || test.labType}
+                    </td>
+
+                    {/* Amount of Units */}
+                    <td className="px-3 py-2 text-center font-bold text-slate-700">
                       {isEditing ? (
                         <input
                           type="number"
                           min={1}
-                          max={10}
-                          value={editUnits}
-                          onChange={(e) => setEditUnits(parseInt(e.target.value) || 1)}
-                          className="px-2 py-1 border border-slate-300 rounded text-xs w-16 text-center"
+                          max={20}
+                          value={test.units}
+                          onChange={(e) =>
+                            onUpdateTest({ ...test, units: Math.max(1, parseInt(e.target.value) || 1) })
+                          }
+                          className="px-2 py-1 border border-blue-400 rounded w-16 text-center font-mono text-xs"
                         />
                       ) : (
                         test.units
                       )}
                     </td>
 
-                    <td className="px-3 py-2 text-center align-middle font-mono">
-                      {test.durationDays} days
+                    {/* Duration in Days */}
+                    <td className="px-3 py-2 text-center font-mono text-slate-700">
+                      {test.durationDays} working days
                     </td>
 
-                    <td className="px-3 py-2 text-center align-middle font-mono">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          min={1}
-                          max={5}
-                          value={editResources}
-                          onChange={(e) => setEditResources(parseInt(e.target.value) || 1)}
-                          className="px-2 py-1 border border-slate-300 rounded text-xs w-16 text-center"
-                        />
-                      ) : (
-                        `${test.resourcesNeededTotal} tech`
-                      )}
+                    {/* Resources Needed */}
+                    <td className="px-3 py-2 text-center font-mono text-slate-700">
+                      {test.resourcesNeededTotal}
                     </td>
 
-                    <td className="px-3 py-2 align-middle font-mono text-slate-600">
-                      {minStartDate}
+                    {/* Start Date */}
+                    <td className="px-3 py-2 text-center font-mono text-slate-600">
+                      {test.startDate}
                     </td>
 
-                    <td className="px-3 py-2 align-middle font-mono text-slate-600">
-                      {maxEndDate}
-                    </td>
+                    {/* Actions & Edit History */}
+                    <td className="px-3 py-2 text-center">
+                      <div className="flex items-center justify-center space-x-1">
+                        <button
+                          onClick={() => setHistoryModalTest(test)}
+                          className="p-1 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="View Edit Audit Log"
+                        >
+                          <History className="h-3.5 w-3.5" />
+                        </button>
 
-                    <td className="px-3 py-2 text-right align-middle space-x-1">
-                      {isEditing ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => saveEditing(test)}
-                            className="px-2 py-1 bg-green-600 text-white text-[11px] rounded hover:bg-green-700"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingTestId(null)}
-                            className="px-2 py-1 bg-slate-200 text-slate-700 text-[11px] rounded hover:bg-slate-300"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => startEditing(test)}
-                            className="p-1 text-slate-500 hover:text-blue-600 rounded hover:bg-slate-100"
-                            title="Edit Test"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => onDeleteTest(test.id)}
-                            className="p-1 text-slate-500 hover:text-red-600 rounded hover:bg-slate-100"
-                            title="Delete Test"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      )}
+                        <button
+                          onClick={() => setEditingTestId(isEditing ? null : test.id)}
+                          className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-200 rounded transition-colors"
+                          title={isEditing ? 'Done Editing' : 'Edit Test'}
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => onDeleteTest(test.id)}
+                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Delete Test"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

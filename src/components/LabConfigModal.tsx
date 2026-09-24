@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import type { Lab, Station, PersonnelResource, LabType } from '../types/labTracker';
-import { LAB_TYPE_LABELS } from '../types/labTracker';
-import { Settings, Plus, Trash2, Calendar, UserCheck, CheckSquare, Square } from 'lucide-react';
+import type { Lab, Station, PersonnelResource, TestTypeConfig, StationCapability } from '../types/labTracker';
+import { DEFAULT_TEST_TYPES } from '../types/labTracker';
+import { X, Plus, Trash2, Settings, Users, Cpu, FileText } from 'lucide-react';
 
 interface LabConfigModalProps {
   isOpen: boolean;
@@ -9,8 +9,10 @@ interface LabConfigModalProps {
   labs: Lab[];
   stations: Station[];
   resources: PersonnelResource[];
+  testTypes?: TestTypeConfig[];
   onUpdateLabsAndStations: (labs: Lab[], stations: Station[]) => void;
   onUpdateResources: (resources: PersonnelResource[]) => void;
+  onUpdateTestTypes?: (testTypes: TestTypeConfig[]) => void;
 }
 
 export const LabConfigModal: React.FC<LabConfigModalProps> = ({
@@ -19,279 +21,476 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
   labs,
   stations,
   resources,
+  testTypes = DEFAULT_TEST_TYPES,
   onUpdateLabsAndStations,
   onUpdateResources,
+  onUpdateTestTypes,
 }) => {
-  const [activeTab, setActiveTab] = useState<'labs' | 'resources'>('labs');
+  const [activeTab, setActiveTab] = useState<'labs' | 'testTypes' | 'stations' | 'techs'>('labs');
 
   const [localLabs, setLocalLabs] = useState<Lab[]>(labs);
   const [localStations, setLocalStations] = useState<Station[]>(stations);
-
   const [localResources, setLocalResources] = useState<PersonnelResource[]>(resources);
-  const [newResourceName, setNewResourceName] = useState('');
-  const [newResourceHoliday, setNewResourceHoliday] = useState('');
+  const [localTestTypes, setLocalTestTypes] = useState<TestTypeConfig[]>(testTypes);
+
+  // New item inputs
+  const [newLabName, setNewLabName] = useState('');
+  const [newLabType, setNewLabType] = useState('washer_energy');
+  const [newLabComments, setNewLabComments] = useState('');
+
+  const [newTestTypeName, setNewTestTypeName] = useState('');
+  const [newTestTypeLabel, setNewTestTypeLabel] = useState('');
+  const [newTestTypeColor, setNewTestTypeColor] = useState('#2563eb');
+
+  const [newTechName, setNewTechName] = useState('');
 
   if (!isOpen) return null;
 
-  const handleStationCountChange = (labId: string, count: number) => {
-    const targetCount = Math.max(1, count);
-    const updatedLabs = localLabs.map((l) => (l.id === labId ? { ...l, stationCount: targetCount } : l));
-    setLocalLabs(updatedLabs);
-
-    const currentStationsForLab = localStations.filter((s) => s.labId === labId);
-    if (currentStationsForLab.length < targetCount) {
-      const toAdd = targetCount - currentStationsForLab.length;
-      const newStations: Station[] = [];
-      for (let i = 1; i <= toAdd; i++) {
-        const stationNumber = currentStationsForLab.length + i;
-        newStations.push({
-          id: `st-${labId}-${Date.now()}-${i}`,
-          labId,
-          stationNumber,
-          notes: `Station ${stationNumber} configured notes`,
-        });
-      }
-      setLocalStations([...localStations, ...newStations]);
-    } else if (currentStationsForLab.length > targetCount) {
-      const keptStationIds = currentStationsForLab.slice(0, targetCount).map((s) => s.id);
-      setLocalStations(localStations.filter((s) => s.labId !== labId || keptStationIds.includes(s.id)));
-    }
-  };
-
-  const handleStationNoteChange = (stationId: string, notes: string) => {
-    setLocalStations(
-      localStations.map((s) => (s.id === stationId ? { ...s, notes } : s))
-    );
-  };
-
-  const toggleCapability = (resId: string, cap: LabType) => {
-    setLocalResources(
-      localResources.map((r) => {
-        if (r.id !== resId) return r;
-        const exists = r.capabilities.includes(cap);
-        const updated = exists
-          ? r.capabilities.filter((c) => c !== cap)
-          : [...r.capabilities, cap];
-        return { ...r, capabilities: updated };
-      })
-    );
-  };
-
-  const addHolidayToResource = (resId: string, holidayDate: string) => {
-    if (!holidayDate) return;
-    setLocalResources(
-      localResources.map((r) => {
-        if (r.id !== resId) return r;
-        if (r.holidays.includes(holidayDate)) return r;
-        return { ...r, holidays: [...r.holidays, holidayDate] };
-      })
-    );
-  };
-
-  const removeHolidayFromResource = (resId: string, holidayDate: string) => {
-    setLocalResources(
-      localResources.map((r) => {
-        if (r.id !== resId) return r;
-        return { ...r, holidays: r.holidays.filter((h) => h !== holidayDate) };
-      })
-    );
-  };
-
-  const handleAddResource = () => {
-    if (!newResourceName.trim()) return;
-    const newRes: PersonnelResource = {
-      id: `res-${Date.now()}`,
-      name: newResourceName.trim(),
-      capabilities: ['washer_energy'],
-      holidays: [],
-    };
-    setLocalResources([...localResources, newRes]);
-    setNewResourceName('');
-  };
-
-  const handleSave = () => {
+  const handleSaveAll = () => {
     onUpdateLabsAndStations(localLabs, localStations);
     onUpdateResources(localResources);
+    if (onUpdateTestTypes) {
+      onUpdateTestTypes(localTestTypes);
+    }
     onClose();
   };
 
+  const handleAddLab = () => {
+    if (!newLabName.trim()) return;
+    const labId = `lab-${Date.now()}`;
+    const newLab: Lab = {
+      id: labId,
+      name: newLabName.trim(),
+      type: newLabType,
+      stationCount: 2,
+      comments: newLabComments.trim() || undefined,
+      supportedTestTypes: [newLabType],
+    };
+
+    const newLabStations: Station[] = [
+      {
+        id: `st-${labId}-1`,
+        labId,
+        stationNumber: 1,
+        name: `${newLabName} - Station 1`,
+        comments: 'Default station setup',
+        capabilities: [],
+      },
+      {
+        id: `st-${labId}-2`,
+        labId,
+        stationNumber: 2,
+        name: `${newLabName} - Station 2`,
+        comments: 'Default station setup',
+        capabilities: [],
+      },
+    ];
+
+    setLocalLabs([...localLabs, newLab]);
+    setLocalStations([...localStations, ...newLabStations]);
+
+    setNewLabName('');
+    setNewLabComments('');
+  };
+
+  const handleDeleteLab = (labId: string) => {
+    if (confirm('Delete this lab and all its stations?')) {
+      setLocalLabs(localLabs.filter((l) => l.id !== labId));
+      setLocalStations(localStations.filter((s) => s.labId !== labId));
+    }
+  };
+
+  const handleAddTestType = () => {
+    if (!newTestTypeLabel.trim()) return;
+    const typeId = newTestTypeName.toLowerCase().replace(/\s+/g, '_') || `type_${Date.now()}`;
+    const newTT: TestTypeConfig = {
+      id: typeId,
+      name: typeId,
+      label: newTestTypeLabel.trim(),
+      color: newTestTypeColor,
+    };
+    setLocalTestTypes([...localTestTypes, newTT]);
+    setNewTestTypeName('');
+    setNewTestTypeLabel('');
+  };
+
+  const handleDeleteTestType = (typeId: string) => {
+    setLocalTestTypes(localTestTypes.filter((tt) => tt.id !== typeId));
+  };
+
+  const handleAddTech = () => {
+    if (!newTechName.trim()) return;
+    const newTech: PersonnelResource = {
+      id: `res-${Date.now()}`,
+      name: newTechName.trim(),
+      capabilities: [localTestTypes[0]?.id || 'washer_energy'],
+      holidays: [],
+    };
+    setLocalResources([...localResources, newTech]);
+    setNewTechName('');
+  };
+
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[85vh]">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50">
-          <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-            <Settings className="h-5 w-5 text-slate-600" />
-            Lab Tracker Configuration
-          </h3>
-          <div className="flex bg-slate-200 p-1 rounded-lg text-xs font-medium">
-            <button
-              onClick={() => setActiveTab('labs')}
-              className={`px-3 py-1 rounded-md transition-all ${
-                activeTab === 'labs' ? 'bg-white shadow-xs text-slate-800 font-semibold' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Labs & Stations
-            </button>
-            <button
-              onClick={() => setActiveTab('resources')}
-              className={`px-3 py-1 rounded-md transition-all ${
-                activeTab === 'resources' ? 'bg-white shadow-xs text-slate-800 font-semibold' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Personnel & Resources
-            </button>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full p-6 space-y-4 border border-slate-200 max-h-[90vh] flex flex-col">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between border-b pb-3">
+          <div className="flex items-center gap-2">
+            <Settings className="h-5 w-5 text-blue-600" />
+            <h2 className="text-base font-bold text-slate-800">Lab & Resource System Configuration</h2>
           </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded">
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <div className="p-5 overflow-y-auto flex-1 space-y-6">
-          {activeTab === 'labs' ? (
-            <div className="space-y-6">
-              {localLabs.map((lab) => {
-                const labStations = localStations.filter((s) => s.labId === lab.id);
-                return (
-                  <div key={lab.id} className="border border-slate-200 rounded-lg p-4 bg-slate-50/50">
-                    <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
-                      <div>
-                        <h4 className="font-bold text-sm text-slate-800">{lab.name}</h4>
-                        <span className="text-xs text-slate-500 font-medium">{LAB_TYPE_LABELS[lab.type]}</span>
+        {/* Tab Navigation */}
+        <div className="flex border-b border-slate-200 gap-2">
+          {[
+            { key: 'labs', label: 'Labs & Supported Types', icon: FileText },
+            { key: 'testTypes', label: 'Custom Test Types', icon: Settings },
+            { key: 'stations', label: 'Stations & Capabilities', icon: Cpu },
+            { key: 'techs', label: 'Technicians & Qualifications', icon: Users },
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key as any)}
+              className={`px-3 py-2 text-xs font-bold flex items-center gap-1.5 border-b-2 transition-colors cursor-pointer ${
+                activeTab === key
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" /> {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content Body */}
+        <div className="flex-1 overflow-y-auto space-y-4 text-xs pr-1">
+          {/* TAB 1: LABS */}
+          {activeTab === 'labs' && (
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                <h3 className="font-bold text-slate-800">Add New Lab</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Lab Name (e.g. Washer Energy Lab E)"
+                    value={newLabName}
+                    onChange={(e) => setNewLabName(e.target.value)}
+                    className="px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
+                  />
+                  <select
+                    value={newLabType}
+                    onChange={(e) => setNewLabType(e.target.value)}
+                    className="px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
+                  >
+                    {localTestTypes.map((tt) => (
+                      <option key={tt.id} value={tt.id}>
+                        {tt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Lab Comments"
+                    value={newLabComments}
+                    onChange={(e) => setNewLabComments(e.target.value)}
+                    className="px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
+                  />
+                </div>
+                <button
+                  onClick={handleAddLab}
+                  className="px-3 py-1.5 bg-blue-600 text-white font-bold rounded text-xs flex items-center gap-1 hover:bg-blue-500 cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Lab
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {localLabs.map((lab) => (
+                  <div key={lab.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between border-b pb-1.5">
+                      <div className="font-bold text-slate-800 text-sm">{lab.name}</div>
+                      <button
+                        onClick={() => handleDeleteLab(lab.id)}
+                        className="text-red-500 hover:text-red-700 p-1"
+                        title="Delete Lab"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-slate-600 block mb-1">Lab Comments:</label>
+                      <input
+                        type="text"
+                        value={lab.comments || ''}
+                        onChange={(e) => {
+                          const updated = localLabs.map((l) =>
+                            l.id === lab.id ? { ...l, comments: e.target.value } : l
+                          );
+                          setLocalLabs(updated);
+                        }}
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-slate-600 block mb-1">Supported Test Types:</label>
+                      <div className="flex flex-wrap gap-2">
+                        {localTestTypes.map((tt) => {
+                          const isSupported = (lab.supportedTestTypes || [lab.type]).includes(tt.id);
+                          return (
+                            <label
+                              key={tt.id}
+                              className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSupported}
+                                onChange={() => {
+                                  const current = lab.supportedTestTypes || [lab.type];
+                                  const updatedTypes = isSupported
+                                    ? current.filter((t) => t !== tt.id)
+                                    : [...current, tt.id];
+                                  setLocalLabs(
+                                    localLabs.map((l) =>
+                                      l.id === lab.id ? { ...l, supportedTestTypes: updatedTypes } : l
+                                    )
+                                  );
+                                }}
+                              />
+                              <span className="font-medium text-slate-700">{tt.label}</span>
+                            </label>
+                          );
+                        })}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-slate-600 font-semibold">Stations Count:</label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: CUSTOM TEST TYPES */}
+          {activeTab === 'testTypes' && (
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                <h3 className="font-bold text-slate-800">Add New Test Type</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Label (e.g. Washer Energy)"
+                    value={newTestTypeLabel}
+                    onChange={(e) => {
+                      setNewTestTypeLabel(e.target.value);
+                      setNewTestTypeName(e.target.value);
+                    }}
+                    className="px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                  />
+                  <div className="flex items-center gap-2">
+                    <label className="text-slate-600 font-semibold">Badge Color:</label>
+                    <input
+                      type="color"
+                      value={newTestTypeColor}
+                      onChange={(e) => setNewTestTypeColor(e.target.value)}
+                      className="w-10 h-7 p-0 border border-slate-300 rounded cursor-pointer"
+                    />
+                  </div>
+                  <button
+                    onClick={handleAddTestType}
+                    className="px-3 py-1.5 bg-blue-600 text-white font-bold rounded text-xs flex items-center gap-1 hover:bg-blue-500 cursor-pointer justify-center"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Type
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {localTestTypes.map((tt) => (
+                  <div key={tt.id} className="bg-white border border-slate-200 rounded-lg p-2.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: tt.color }} />
+                      <span className="font-bold text-slate-800">{tt.label}</span>
+                      <span className="font-mono text-[10px] text-slate-400">({tt.id})</span>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteTestType(tt.id)}
+                      className="text-red-500 hover:text-red-700 p-1"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: STATIONS & CAPABILITIES */}
+          {activeTab === 'stations' && (
+            <div className="space-y-3">
+              {localStations.map((station) => {
+                const lab = localLabs.find((l) => l.id === station.labId);
+                return (
+                  <div key={station.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between border-b pb-1 font-bold text-slate-800">
+                      <span>{station.name} ({lab?.name})</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="font-semibold text-slate-600 block mb-1">Station Name:</label>
                         <input
-                          type="number"
-                          min={1}
-                          max={10}
-                          value={lab.stationCount}
-                          onChange={(e) => handleStationCountChange(lab.id, parseInt(e.target.value) || 1)}
-                          className="w-16 px-2 py-1 border border-slate-300 rounded text-xs font-bold text-center bg-white"
+                          type="text"
+                          value={station.name}
+                          onChange={(e) => {
+                            setLocalStations(
+                              localStations.map((s) =>
+                                s.id === station.id ? { ...s, name: e.target.value } : s
+                              )
+                            );
+                          }}
+                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-600 block mb-1">Station Comments:</label>
+                        <input
+                          type="text"
+                          value={station.comments || ''}
+                          onChange={(e) => {
+                            setLocalStations(
+                              localStations.map((s) =>
+                                s.id === station.id ? { ...s, comments: e.target.value } : s
+                              )
+                            );
+                          }}
+                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
                         />
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Station Notes Setup</p>
-                      {labStations.map((station) => (
-                        <div key={station.id} className="flex items-center gap-3 bg-white p-2 border border-slate-200 rounded-md">
-                          <span className="text-xs font-semibold text-slate-700 w-24 shrink-0">
-                            Station {station.stationNumber}
-                          </span>
-                          <input
-                            type="text"
-                            value={station.notes}
-                            onChange={(e) => handleStationNoteChange(station.id, e.target.value)}
-                            placeholder="Add station notes (e.g. 220V power, water hookup specs...)"
-                            className="flex-1 px-2.5 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                        </div>
-                      ))}
+                    {/* Capabilities List (Thermistor 1, Scale, Humidity Sensor) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-semibold text-slate-600">Station Capabilities & Sensors:</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newCapName = prompt('Enter capability name (e.g. Thermistor 1, Scale, Humidity Sensor):');
+                            if (!newCapName) return;
+                            const newCapComment = prompt('Enter comments for this capability:') || '';
+                            const newCap: StationCapability = {
+                              id: `cap-${Date.now()}`,
+                              name: newCapName,
+                              comments: newCapComment,
+                            };
+                            const updatedCaps = [...(station.capabilities || []), newCap];
+                            setLocalStations(
+                              localStations.map((s) =>
+                                s.id === station.id ? { ...s, capabilities: updatedCaps } : s
+                              )
+                            );
+                          }}
+                          className="text-[10px] text-blue-600 hover:underline font-bold"
+                        >
+                          + Add Capability
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {(station.capabilities || []).map((cap) => (
+                          <div key={cap.id} className="bg-emerald-50 border border-emerald-200 px-2 py-1 rounded text-[11px] flex items-center gap-2">
+                            <div>
+                              <span className="font-bold text-emerald-900">{cap.name}</span>
+                              {cap.comments && <span className="text-emerald-700 italic block text-[9px]">{cap.comments}</span>}
+                            </div>
+                            <button
+                              onClick={() => {
+                                const updatedCaps = (station.capabilities || []).filter((c) => c.id !== cap.id);
+                                setLocalStations(
+                                  localStations.map((s) =>
+                                    s.id === station.id ? { ...s, capabilities: updatedCaps } : s
+                                  )
+                                );
+                              }}
+                              className="text-red-500 hover:text-red-700 font-bold text-xs"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <input
-                  type="text"
-                  value={newResourceName}
-                  onChange={(e) => setNewResourceName(e.target.value)}
-                  placeholder="New technician name..."
-                  className="flex-1 px-3 py-1.5 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
-                />
-                <button
-                  onClick={handleAddResource}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold flex items-center gap-1"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add Resource
-                </button>
+          )}
+
+          {/* TAB 4: TECHNICIANS */}
+          {activeTab === 'techs' && (
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                <h3 className="font-bold text-slate-800">Add New Technician</h3>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Technician Name (e.g. Jane Doe)"
+                    value={newTechName}
+                    onChange={(e) => setNewTechName(e.target.value)}
+                    className="flex-1 px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
+                  />
+                  <button
+                    onClick={handleAddTech}
+                    className="px-3 py-1.5 bg-blue-600 text-white font-bold rounded text-xs flex items-center gap-1 hover:bg-blue-500 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Tech
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-4">
-                {localResources.map((res) => (
-                  <div key={res.id} className="border border-slate-200 rounded-lg p-4 bg-white shadow-2xs space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                      <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
-                        <UserCheck className="h-4 w-4 text-blue-600" /> {res.name}
-                      </span>
+              <div className="space-y-3">
+                {localResources.map((tech) => (
+                  <div key={tech.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between border-b pb-1 font-bold text-slate-800">
+                      <span>{tech.name}</span>
                       <button
-                        onClick={() => setLocalResources(localResources.filter((r) => r.id !== res.id))}
-                        className="text-slate-400 hover:text-red-600 text-xs flex items-center gap-1"
+                        onClick={() => setLocalResources(localResources.filter((r) => r.id !== tech.id))}
+                        className="text-red-500 hover:text-red-700 p-1"
                       >
-                        <Trash2 className="h-3.5 w-3.5" /> Remove
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
 
                     <div>
-                      <p className="text-[11px] font-semibold text-slate-600 mb-2">Test Type Capabilities:</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {Object.entries(LAB_TYPE_LABELS).map(([typeKey, typeLabel]) => {
-                          const isCapable = res.capabilities.includes(typeKey as LabType);
+                      <label className="font-semibold text-slate-600 block mb-1">Qualified Lab Capabilities:</label>
+                      <div className="flex flex-wrap gap-2">
+                        {localTestTypes.map((tt) => {
+                          const carriesCap = tech.capabilities.includes(tt.id);
                           return (
-                            <button
-                              key={typeKey}
-                              type="button"
-                              onClick={() => toggleCapability(res.id, typeKey as LabType)}
-                              className={`flex items-center gap-2 p-2 rounded text-xs border text-left transition-colors ${
-                                isCapable
-                                  ? 'bg-blue-50 border-blue-300 text-blue-900 font-medium'
-                                  : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
-                              }`}
-                            >
-                              {isCapable ? (
-                                <CheckSquare className="h-4 w-4 text-blue-600 shrink-0" />
-                              ) : (
-                                <Square className="h-4 w-4 text-slate-400 shrink-0" />
-                              )}
-                              <span>{typeLabel}</span>
-                            </button>
+                            <label key={tt.id} className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={carriesCap}
+                                onChange={() => {
+                                  const updatedCaps = carriesCap
+                                    ? tech.capabilities.filter((c) => c !== tt.id)
+                                    : [...tech.capabilities, tt.id];
+                                  setLocalResources(
+                                    localResources.map((r) =>
+                                      r.id === tech.id ? { ...r, capabilities: updatedCaps } : r
+                                    )
+                                  );
+                                }}
+                              />
+                              <span className="font-medium text-slate-700">{tt.label}</span>
+                            </label>
                           );
                         })}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-[11px] font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5 text-slate-500" /> Configured Holiday Off Days:
-                      </p>
-                      <div className="flex items-center gap-2 mb-2">
-                        <input
-                          type="date"
-                          value={newResourceHoliday}
-                          onChange={(e) => setNewResourceHoliday(e.target.value)}
-                          className="px-2 py-1 text-xs border border-slate-300 rounded"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            addHolidayToResource(res.id, newResourceHoliday);
-                            setNewResourceHoliday('');
-                          }}
-                          className="px-2.5 py-1 bg-slate-800 text-white rounded text-xs font-medium hover:bg-slate-900"
-                        >
-                          Add Off Day
-                        </button>
-                      </div>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        {res.holidays.length === 0 ? (
-                          <span className="text-[11px] text-slate-400 italic">No holiday off days set.</span>
-                        ) : (
-                          res.holidays.map((hDate) => (
-                            <span
-                              key={hDate}
-                              className="inline-flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-200 text-[11px] px-2 py-0.5 rounded font-mono"
-                            >
-                              {hDate}
-                              <button
-                                onClick={() => removeHolidayFromResource(res.id, hDate)}
-                                className="text-amber-700 hover:text-amber-950 font-bold ml-1"
-                              >
-                                &times;
-                              </button>
-                            </span>
-                          ))
-                        )}
                       </div>
                     </div>
                   </div>
@@ -301,18 +500,21 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
           )}
         </div>
 
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
+        {/* Modal Footer */}
+        <div className="flex items-center justify-end gap-2 pt-3 border-t">
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 text-xs font-medium"
+            className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 cursor-pointer"
           >
             Cancel
           </button>
           <button
-            onClick={handleSave}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm"
+            type="button"
+            onClick={handleSaveAll}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg shadow-sm cursor-pointer"
           >
-            Save Configuration
+            Save All Configurations
           </button>
         </div>
       </div>
