@@ -85,6 +85,7 @@ export interface LabTest {
   testOwner?: string;
   vrNumber?: string;
   linkToVR?: string;
+  status?: 'active' | 'completed';
   editHistory?: TestEditLog[];
 }
 

@@ -50,6 +50,25 @@ export const SidePanel: React.FC<SidePanelProps> = ({
 
       {/* Body Content */}
       <div className="flex-1 p-5 overflow-y-auto space-y-5 text-xs text-slate-700">
+        {/* Completion Status Toggle */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-center justify-between">
+          <div>
+            <span className="font-bold text-slate-800 text-xs block">Test Completion Status</span>
+            <span className="text-[11px] text-slate-500">
+              {test.status === 'completed' ? 'Completed (Hidden from workload & monitoring)' : 'Active Test'}
+            </span>
+          </div>
+          <span
+            className={`px-2.5 py-1 rounded font-bold text-xs ${
+              test.status === 'completed'
+                ? 'bg-slate-200 text-slate-700 border border-slate-300'
+                : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+            }`}
+          >
+            {test.status === 'completed' ? 'Completed ✓' : 'Active'}
+          </span>
+        </div>
+
         {/* Test Comments & Assigned Technician */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
           <div>

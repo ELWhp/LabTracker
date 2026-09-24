@@ -18,6 +18,9 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
 }) => {
   const typeMap = new Map<string, string>(testTypes.map((tt) => [tt.id, tt.label]));
 
+  // Exclude completed tests from technician workload
+  const activeTests = tests.filter((t) => t.status !== 'completed');
+
   return (
     <div className="space-y-6">
       {/* Header Overview Card */}
@@ -30,7 +33,7 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
             <div>
               <h2 className="text-base font-bold text-slate-900">Technician Workload & Concurrent Test Tracking</h2>
               <p className="text-xs text-slate-500">
-                Track technician availability, assigned tests, off-days, and parallel test lanes
+                Track technician availability, active test assignments, off-days, and parallel test lanes (Completed tests excluded)
               </p>
             </div>
           </div>
@@ -42,7 +45,7 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
         {/* Technician Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {resources.map((tech) => {
-            const assignedTests = tests.filter((t) => {
+            const assignedActiveTests = activeTests.filter((t) => {
               if (t.assignedTechName) {
                 return t.assignedTechName.toLowerCase() === tech.name.toLowerCase();
               }
@@ -104,11 +107,11 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
 
                 <div className="pt-2 border-t">
                   <div className="flex items-center justify-between text-xs text-slate-600 mb-1">
-                    <span className="font-semibold">Assigned Active Tests:</span>
-                    <span className="font-bold text-slate-900">{assignedTests.length}</span>
+                    <span className="font-semibold">Active Assigned Tests:</span>
+                    <span className="font-bold text-slate-900">{assignedActiveTests.length}</span>
                   </div>
                   <div className="space-y-1">
-                    {assignedTests.map((at) => (
+                    {assignedActiveTests.map((at) => (
                       <div
                         key={at.id}
                         className="text-[11px] bg-white border border-slate-200 p-1.5 rounded flex items-center justify-between"
@@ -132,10 +135,10 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
         </div>
       </div>
 
-      {/* Technician Timeline Schedule Heatmap with Parallel Test Lanes */}
+      {/* Technician Timeline Schedule Heatmap with Parallel Active Test Lanes */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs overflow-x-auto">
         <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-blue-600" /> Technician Multi-Test Timeline (Parallel Concurrent Test Lanes)
+          <Calendar className="h-4 w-4 text-blue-600" /> Technician Active Test Lanes
         </h3>
 
         <table className="min-w-full border-collapse text-xs select-none">
@@ -159,15 +162,14 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
           </thead>
           <tbody>
             {resources.map((tech) => {
-              const techTests = tests.filter((t) => {
+              const techActiveTests = activeTests.filter((t) => {
                 if (t.assignedTechName) {
                   return t.assignedTechName.toLowerCase() === tech.name.toLowerCase();
                 }
                 return t.labType && tech.capabilities.includes(t.labType);
               });
 
-              // Create parallel lanes if tech has multiple active tests
-              const lanes = techTests.length > 0 ? techTests : [null];
+              const lanes = techActiveTests.length > 0 ? techActiveTests : [null];
 
               return lanes.map((testItem, laneIdx) => (
                 <tr key={`${tech.id}-lane-${laneIdx}`} className="border-b border-slate-200">

@@ -46,9 +46,9 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 }) => {
   const testMap = new Map<string, LabTest>(tests.map((t) => [t.id, t]));
 
-  // Resizable column width states
-  const [labColWidth, setLabColWidth] = useState<number>(300); // Column 1 width in px
-  const [stationColWidth, setStationColWidth] = useState<number>(240); // Column 2 width in px
+  // Resizable column width states (defaults in pixels)
+  const [labColWidth, setLabColWidth] = useState<number>(220);
+  const [stationColWidth, setStationColWidth] = useState<number>(200);
 
   const [isResizingCol1, setIsResizingCol1] = useState(false);
   const [isResizingCol2, setIsResizingCol2] = useState(false);
@@ -64,17 +64,13 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Handle column 1 and column 2 resizing drag events
+  // Handle smooth column 1 and column 2 resizing drag events using mouse movement deltas
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isResizingCol1 && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const newWidth = Math.max(160, Math.min(600, e.clientX - rect.left));
-        setLabColWidth(newWidth);
-      } else if (isResizingCol2 && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const newWidth = Math.max(140, Math.min(600, e.clientX - rect.left - labColWidth));
-        setStationColWidth(newWidth);
+      if (isResizingCol1) {
+        setLabColWidth((prev) => Math.max(140, Math.min(500, prev + e.movementX)));
+      } else if (isResizingCol2) {
+        setStationColWidth((prev) => Math.max(120, Math.min(500, prev + e.movementX)));
       }
     };
 
@@ -92,7 +88,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizingCol1, isResizingCol2, labColWidth]);
+  }, [isResizingCol1, isResizingCol2]);
 
   // Close popup when clicking outside
   useEffect(() => {
@@ -194,6 +190,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     width: `${labColWidth}px`,
     minWidth: `${labColWidth}px`,
     maxWidth: `${labColWidth}px`,
+    boxSizing: 'border-box',
   };
 
   const col2Style: React.CSSProperties = {
@@ -202,6 +199,14 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     width: `${stationColWidth}px`,
     minWidth: `${stationColWidth}px`,
     maxWidth: `${stationColWidth}px`,
+    boxSizing: 'border-box',
+  };
+
+  const dayColStyle: React.CSSProperties = {
+    width: '36px',
+    minWidth: '36px',
+    maxWidth: '36px',
+    boxSizing: 'border-box',
   };
 
   return (
@@ -254,7 +259,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
         </div>
       )}
 
-      <table className="min-w-full border-collapse text-xs select-none">
+      <table className="w-full border-collapse text-xs select-none" style={{ tableLayout: 'fixed' }}>
         <thead>
           <tr className="bg-slate-800 text-white font-semibold text-center border-b border-slate-700">
             <th style={col1Style} className="px-3 py-2 bg-slate-800 z-20 border-r border-slate-700 text-left">
@@ -262,7 +267,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             </th>
             <th style={col2Style} className="px-3 py-2 bg-slate-800 z-20 border-r border-slate-700 text-left" />
             {yearSpans.map((y, idx) => (
-              <th key={idx} colSpan={y.colSpan} className="px-2 py-1 border-r border-slate-700">
+              <th key={idx} colSpan={y.colSpan} className="px-1 py-1 border-r border-slate-700">
                 {y.year}
               </th>
             ))}
@@ -274,7 +279,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             </th>
             <th style={col2Style} className="px-3 py-1.5 bg-slate-700 z-20 border-r border-slate-600 text-left" />
             {monthSpans.map((m, idx) => (
-              <th key={idx} colSpan={m.colSpan} className="px-2 py-1 border-r border-slate-600">
+              <th key={idx} colSpan={m.colSpan} className="px-1 py-1 border-r border-slate-600">
                 {m.monthName}
               </th>
             ))}
@@ -286,7 +291,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             </th>
             <th style={col2Style} className="px-3 py-1 bg-slate-600 z-20 border-r border-slate-500 text-left" />
             {weekSpans.map((w, idx) => (
-              <th key={idx} colSpan={w.colSpan} className="px-1 py-1 border-r border-slate-500">
+              <th key={idx} colSpan={w.colSpan} className="px-0.5 py-1 border-r border-slate-500 text-[10px]">
                 W{w.weekNumber}
               </th>
             ))}
@@ -330,7 +335,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
               return (
                 <th
                   key={day.dateStr}
-                  className={`w-8 min-w-[32px] px-0.5 py-1 border-r border-slate-200 relative ${
+                  style={dayColStyle}
+                  className={`px-0.5 py-1 border-r border-slate-200 relative text-center ${
                     day.isWeekend ? 'bg-slate-200 text-slate-400' : 'bg-slate-50'
                   }`}
                   title={`${day.dateStr} (${day.monthName} ${day.dayOfMonth})${
@@ -472,11 +478,13 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                             draggable
                             onDragStart={(e) => handleDragStart(e, alloc)}
                             onClick={() => onSelectAllocation(alloc, test)}
-                            style={{ backgroundColor: test.color || '#2563eb' }}
+                            style={{ backgroundColor: test.status === 'completed' ? '#94a3b8' : test.color || '#2563eb' }}
                             className={`h-full w-full rounded-md px-2 text-white font-medium flex items-center justify-between cursor-grab active:cursor-grabbing shadow-sm transition-all hover:brightness-110 relative group ${
+                              test.status === 'completed' ? 'opacity-80' : ''
+                            } ${
                               isSelected ? 'ring-2 ring-black ring-offset-1 z-10' : ''
                             }`}
-                            title={`Test: ${test.name}\nVR: ${test.vrNumber || 'N/A'}\nOwner: ${test.testOwner || 'N/A'}\nUnit: ${alloc.unitIndex}/${alloc.totalUnits}\nDates: ${alloc.startDate} to ${alloc.endDate}\nDrag handles on left/right to extend or shrink test duration!`}
+                            title={`Test: ${test.name} ${test.status === 'completed' ? '(Completed)' : ''}\nVR: ${test.vrNumber || 'N/A'}\nOwner: ${test.testOwner || 'N/A'}\nUnit: ${alloc.unitIndex}/${alloc.totalUnits}\nDates: ${alloc.startDate} to ${alloc.endDate}\nDrag handles on left/right to extend or shrink test duration!`}
                           >
                             {/* Left Resize Handle */}
                             {onResizeAllocation && (
@@ -529,6 +537,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                     return (
                       <td
                         key={day.dateStr}
+                        style={dayColStyle}
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, station.id, day.dateStr)}
                         onDoubleClick={() => onDoubleClickCell && onDoubleClickCell(station.id, day.dateStr)}

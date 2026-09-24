@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { LabTest, TestTypeConfig, CalendarDay } from '../types/labTracker';
 import { LAB_TYPE_LABELS } from '../types/labTracker';
-import { Trash2, Edit2, ExternalLink, User, FileCode, History } from 'lucide-react';
+import { Trash2, Edit2, ExternalLink, User, FileCode, History, CheckCircle2, RotateCcw } from 'lucide-react';
 
 interface MonitoringTableProps {
   tests: LabTest[];
@@ -20,8 +20,15 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
 }) => {
   const [editingTestId, setEditingTestId] = useState<string | null>(null);
   const [historyModalTest, setHistoryModalTest] = useState<LabTest | null>(null);
+  const [showCompleted, setShowCompleted] = useState<boolean>(false);
 
   const typeMap = new Map<string, string>(testTypes.map((tt) => [tt.id, tt.label]));
+
+  // Filter out completed tests unless user enables "Show Completed Tests"
+  const visibleTests = tests.filter((t) => {
+    if (showCompleted) return true;
+    return t.status !== 'completed';
+  });
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 space-y-3">
@@ -72,16 +79,29 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
             Real-time schedule parameters, VR numbers, test owners, chronogram timeline bars & edit audit logs
           </p>
         </div>
-        <span className="text-xs font-semibold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full border border-slate-200">
-          Total Scheduled Tests: {tests.length}
-        </span>
+
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 cursor-pointer select-none bg-slate-50 px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-100">
+            <input
+              type="checkbox"
+              checked={showCompleted}
+              onChange={(e) => setShowCompleted(e.target.checked)}
+              className="text-blue-600 rounded"
+            />
+            <span>Show Completed Tests ({tests.filter((t) => t.status === 'completed').length})</span>
+          </label>
+
+          <span className="text-xs font-semibold bg-blue-50 text-blue-800 px-2.5 py-1 rounded-full border border-blue-200">
+            Active Tests: {tests.filter((t) => t.status !== 'completed').length}
+          </span>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse text-xs">
           <thead>
             <tr className="bg-slate-100 text-slate-700 font-bold text-left border-b border-slate-300">
-              <th className="px-3 py-2 min-w-[600px] w-[88%]">Chronogram Timeline (90% Width)</th>
+              <th className="px-3 py-2 min-w-[650px] w-[88%]">Chronogram Timeline (90% Width)</th>
               <th className="px-3 py-2">Test Name</th>
               <th className="px-3 py-2">Test Comments</th>
               <th className="px-3 py-2">Assigned Tech</th>
@@ -91,19 +111,20 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
               <th className="px-3 py-2 text-center">Units</th>
               <th className="px-3 py-2 text-center">Duration</th>
               <th className="px-3 py-2 text-center">Start Date</th>
-              <th className="px-3 py-2 text-center">Actions</th>
+              <th className="px-3 py-2 text-center">Status & Actions</th>
             </tr>
           </thead>
           <tbody>
-            {tests.length === 0 ? (
+            {visibleTests.length === 0 ? (
               <tr>
                 <td colSpan={11} className="px-3 py-6 text-center text-slate-400 italic">
-                  No tests scheduled yet. Click "+ Add Test" or double-click on the timeline grid to create one!
+                  {showCompleted ? 'No completed or active tests found.' : 'No active tests scheduled. Mark tests as completed to hide them, or check "Show Completed Tests".'}
                 </td>
               </tr>
             ) : (
-              tests.map((test) => {
+              visibleTests.map((test) => {
                 const isEditing = editingTestId === test.id;
+                const isCompleted = test.status === 'completed';
 
                 const totalCalDays = Math.max(1, calendarDays.length);
                 const testStartIndex = calendarDays.findIndex((d) => d.dateStr === test.startDate);
@@ -121,7 +142,12 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
                 }
 
                 return (
-                  <tr key={test.id} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
+                  <tr
+                    key={test.id}
+                    className={`border-b border-slate-200 transition-colors ${
+                      isCompleted ? 'bg-slate-100/70 text-slate-500' : 'hover:bg-slate-50'
+                    }`}
+                  >
                     {/* Visual Chronogram Column */}
                     <td className="px-3 py-2 align-middle">
                       <div className="w-full bg-slate-100 h-4 rounded-full overflow-hidden relative border border-slate-200" title={`Chronogram: ${test.startDate} to ${testEndDate}`}>
@@ -129,7 +155,7 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
                           style={{
                             marginLeft: `${leftPercent}%`,
                             width: `${Math.min(100 - leftPercent, widthPercent)}%`,
-                            backgroundColor: test.color || '#2563eb',
+                            backgroundColor: isCompleted ? '#94a3b8' : test.color || '#2563eb',
                           }}
                           className="h-full rounded-full transition-all"
                         />
@@ -140,7 +166,7 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
                     </td>
 
                     {/* Test Name */}
-                    <td className="px-3 py-2 font-semibold text-slate-800">
+                    <td className="px-3 py-2 font-semibold">
                       {isEditing ? (
                         <input
                           type="text"
@@ -150,8 +176,13 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
                         />
                       ) : (
                         <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: test.color }} />
-                          <span className="font-bold">{test.name}</span>
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: isCompleted ? '#94a3b8' : test.color }}
+                          />
+                          <span className={`font-bold ${isCompleted ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                            {test.name}
+                          </span>
                         </div>
                       )}
                     </td>
@@ -252,9 +283,34 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
                       {test.startDate}
                     </td>
 
-                    {/* Actions & Edit History */}
+                    {/* Actions & Mark as Completed Toggle */}
                     <td className="px-3 py-2 text-center">
                       <div className="flex items-center justify-center space-x-1">
+                        <button
+                          onClick={() =>
+                            onUpdateTest({
+                              ...test,
+                              status: isCompleted ? 'active' : 'completed',
+                            })
+                          }
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 transition-colors ${
+                            isCompleted
+                              ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                              : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300'
+                          }`}
+                          title={isCompleted ? 'Reactivate Test' : 'Mark Test as Completed (hides from workload & table)'}
+                        >
+                          {isCompleted ? (
+                            <>
+                              <RotateCcw className="h-3 w-3" /> Reactivate
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Complete
+                            </>
+                          )}
+                        </button>
+
                         <button
                           onClick={() => setHistoryModalTest(test)}
                           className="p-1 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
