@@ -81,14 +81,15 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
         <table className="min-w-full border-collapse text-xs">
           <thead>
             <tr className="bg-slate-100 text-slate-700 font-bold text-left border-b border-slate-300">
-              <th className="px-3 py-2 w-32">Chronogram</th>
+              <th className="px-3 py-2 min-w-[380px] w-[55%]">Chronogram Timeline</th>
               <th className="px-3 py-2">Test Name</th>
+              <th className="px-3 py-2">Test Comments</th>
+              <th className="px-3 py-2">Assigned Tech</th>
               <th className="px-3 py-2">VR # & Link</th>
-              <th className="px-3 py-2">Owner / User</th>
+              <th className="px-3 py-2">Owner</th>
               <th className="px-3 py-2">Lab Type</th>
               <th className="px-3 py-2 text-center">Units</th>
               <th className="px-3 py-2 text-center">Duration</th>
-              <th className="px-3 py-2 text-center">Resources Req</th>
               <th className="px-3 py-2 text-center">Start Date</th>
               <th className="px-3 py-2 text-center">Actions</th>
             </tr>
@@ -96,7 +97,7 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
           <tbody>
             {tests.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-3 py-6 text-center text-slate-400 italic">
+                <td colSpan={11} className="px-3 py-6 text-center text-slate-400 italic">
                   No tests scheduled yet. Click "+ Add Test" or double-click on the timeline grid to create one!
                 </td>
               </tr>
@@ -150,8 +151,40 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
                       ) : (
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: test.color }} />
-                          <span>{test.name}</span>
+                          <span className="font-bold">{test.name}</span>
                         </div>
+                      )}
+                    </td>
+
+                    {/* Test Comments */}
+                    <td className="px-3 py-2 text-slate-600 italic">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={test.testComments || ''}
+                          placeholder="e.g. Needs scale"
+                          onChange={(e) => onUpdateTest({ ...test, testComments: e.target.value })}
+                          className="px-2 py-1 border border-blue-400 rounded w-full font-sans text-xs"
+                        />
+                      ) : (
+                        <span className="line-clamp-2">{test.testComments || 'None'}</span>
+                      )}
+                    </td>
+
+                    {/* Assigned Tech */}
+                    <td className="px-3 py-2 text-slate-700 font-medium">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={test.assignedTechName || ''}
+                          placeholder="Tech Name"
+                          onChange={(e) => onUpdateTest({ ...test, assignedTechName: e.target.value })}
+                          className="px-2 py-1 border border-blue-400 rounded w-full font-sans text-xs"
+                        />
+                      ) : (
+                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-[11px]">
+                          {test.assignedTechName || 'Auto-Assigned'}
+                        </span>
                       )}
                     </td>
 
@@ -212,11 +245,6 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
                     {/* Duration in Days */}
                     <td className="px-3 py-2 text-center font-mono text-slate-700">
                       {test.durationDays} working days
-                    </td>
-
-                    {/* Resources Needed */}
-                    <td className="px-3 py-2 text-center font-mono text-slate-700">
-                      {test.resourcesNeededTotal}
                     </td>
 
                     {/* Start Date */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Lab, Station, LabTest, UnitAllocation, TestTypeConfig } from '../types/labTracker';
+import type { Lab, Station, LabTest, UnitAllocation, TestTypeConfig, PersonnelResource } from '../types/labTracker';
 import { getRandomVibrantColor, addWorkingDays } from '../utils/labTrackerUtils';
 import { X, Plus, Sparkles, User, FileCode, ExternalLink } from 'lucide-react';
 
@@ -8,6 +8,7 @@ interface AddTestModalProps {
   onClose: () => void;
   labs: Lab[];
   stations: Station[];
+  resources?: PersonnelResource[];
   testTypes?: TestTypeConfig[];
   defaultStartDate: string;
   prefilledStationId?: string;
@@ -20,6 +21,7 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
   onClose,
   labs,
   stations,
+  resources = [],
   testTypes = [],
   defaultStartDate,
   prefilledStationId,
@@ -27,6 +29,8 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
   onAddTest,
 }) => {
   const [testName, setTestName] = useState('');
+  const [testComments, setTestComments] = useState('');
+  const [assignedTechName, setAssignedTechName] = useState('');
   const [vrNumber, setVrNumber] = useState('');
   const [linkToVR, setLinkToVR] = useState('');
   const [testOwner, setTestOwner] = useState(currentUserEmail);
@@ -49,8 +53,16 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
           setLabType(lab.type);
         }
       }
+
+      // Auto-assign qualified technician based on labType
+      const qualifiedTech = resources.find((r) => r.capabilities.includes(labType));
+      if (qualifiedTech) {
+        setAssignedTechName(qualifiedTech.name);
+      } else if (resources.length > 0) {
+        setAssignedTechName(resources[0].name);
+      }
     }
-  }, [isOpen, defaultStartDate, prefilledStationId, currentUserEmail, stations, labs]);
+  }, [isOpen, defaultStartDate, prefilledStationId, currentUserEmail, stations, labs, resources, labType]);
 
   if (!isOpen) return null;
 
@@ -88,6 +100,8 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
     const newTest: LabTest = {
       id: testId,
       name: testName,
+      testComments: testComments.trim() || undefined,
+      assignedTechName: assignedTechName.trim() || undefined,
       vrNumber: vrNumber.trim() || undefined,
       linkToVR: linkToVR.trim() || undefined,
       testOwner: testOwner.trim() || currentUserEmail,
@@ -102,7 +116,7 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
         {
           timestamp: new Date().toLocaleString(),
           updatedBy: testOwner || currentUserEmail,
-          details: 'Created test schedule.',
+          details: `Created test schedule. Assigned Tech: ${assignedTechName || 'Auto'}`,
         },
       ],
     };
@@ -110,6 +124,7 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
     onAddTest(newTest);
     onClose();
     setTestName('');
+    setTestComments('');
     setVrNumber('');
     setLinkToVR('');
   };
@@ -136,11 +151,33 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
               placeholder="e.g., ENERGY STAR Audit Cycle 2026"
               value={testName}
               onChange={(e) => setTestName(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-sans text-xs"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-sans text-xs font-bold"
+            />
+          </div>
+
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Test Comments / Notes (e.g. Needs Scale)</label>
+            <textarea
+              rows={2}
+              placeholder="e.g., Requires precision scale and humidity probe"
+              value={testComments}
+              onChange={(e) => setTestComments(e.target.value)}
+              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-sans text-xs"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Assigned Technician (Auto-Assigned)</label>
+              <input
+                type="text"
+                placeholder="Technician Name"
+                value={assignedTechName}
+                onChange={(e) => setAssignedTechName(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-sans text-xs bg-emerald-50/50"
+              />
+            </div>
+
             <div>
               <label className="font-semibold text-slate-700 block mb-1 flex items-center gap-1">
                 <FileCode className="h-3.5 w-3.5 text-slate-400" /> VR Number

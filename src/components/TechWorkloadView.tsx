@@ -28,9 +28,9 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
               <Users className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Technician Workload & Resource Allocation</h2>
+              <h2 className="text-base font-bold text-slate-900">Technician Workload & Concurrent Test Tracking</h2>
               <p className="text-xs text-slate-500">
-                Track team capacity, lab capability qualifications, off-days, and scheduled test load
+                Track technician availability, assigned tests, off-days, and parallel test lanes
               </p>
             </div>
           </div>
@@ -43,6 +43,9 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {resources.map((tech) => {
             const assignedTests = tests.filter((t) => {
+              if (t.assignedTechName) {
+                return t.assignedTechName.toLowerCase() === tech.name.toLowerCase();
+              }
               return t.labType && tech.capabilities.includes(t.labType);
             });
 
@@ -101,7 +104,7 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
 
                 <div className="pt-2 border-t">
                   <div className="flex items-center justify-between text-xs text-slate-600 mb-1">
-                    <span className="font-semibold">Matching Active Lab Tests:</span>
+                    <span className="font-semibold">Assigned Active Tests:</span>
                     <span className="font-bold text-slate-900">{assignedTests.length}</span>
                   </div>
                   <div className="space-y-1">
@@ -110,9 +113,14 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
                         key={at.id}
                         className="text-[11px] bg-white border border-slate-200 p-1.5 rounded flex items-center justify-between"
                       >
-                        <span className="font-semibold truncate max-w-[170px]" style={{ color: at.color }}>
-                          {at.name}
-                        </span>
+                        <div>
+                          <span className="font-semibold block truncate max-w-[170px]" style={{ color: at.color }}>
+                            {at.name}
+                          </span>
+                          {at.testComments && (
+                            <span className="text-[10px] text-slate-500 italic block">{at.testComments}</span>
+                          )}
+                        </div>
                         <span className="text-[10px] text-slate-500 font-mono">{at.startDate}</span>
                       </div>
                     ))}
@@ -124,17 +132,17 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
         </div>
       </div>
 
-      {/* Technician Timeline Schedule Heatmap */}
+      {/* Technician Timeline Schedule Heatmap with Parallel Test Lanes */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs overflow-x-auto">
         <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-blue-600" /> Daily Availability & Workload Heatmap
+          <Calendar className="h-4 w-4 text-blue-600" /> Technician Multi-Test Timeline (Parallel Concurrent Test Lanes)
         </h3>
 
         <table className="min-w-full border-collapse text-xs select-none">
           <thead>
             <tr className="bg-slate-800 text-white font-semibold">
               <th className="px-3 py-2 text-left sticky left-0 bg-slate-800 z-10 border-r border-slate-700 w-44">
-                Technician
+                Technician & Test Lane
               </th>
               {calendarDays.slice(0, 30).map((day) => (
                 <th
@@ -150,41 +158,81 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
             </tr>
           </thead>
           <tbody>
-            {resources.map((tech) => (
-              <tr key={tech.id} className="border-b border-slate-200">
-                <td className="px-3 py-2.5 font-bold text-slate-800 sticky left-0 bg-slate-100 z-10 border-r border-slate-300">
-                  {tech.name}
-                </td>
-                {calendarDays.slice(0, 30).map((day) => {
-                  const isOff = tech.holidays.includes(day.dateStr);
-                  if (isOff) {
+            {resources.map((tech) => {
+              const techTests = tests.filter((t) => {
+                if (t.assignedTechName) {
+                  return t.assignedTechName.toLowerCase() === tech.name.toLowerCase();
+                }
+                return t.labType && tech.capabilities.includes(t.labType);
+              });
+
+              // Create parallel lanes if tech has multiple active tests
+              const lanes = techTests.length > 0 ? techTests : [null];
+
+              return lanes.map((testItem, laneIdx) => (
+                <tr key={`${tech.id}-lane-${laneIdx}`} className="border-b border-slate-200">
+                  {laneIdx === 0 && (
+                    <td
+                      rowSpan={lanes.length}
+                      className="px-3 py-2.5 font-bold text-slate-800 sticky left-0 bg-slate-100 z-10 border-r border-slate-300 align-top"
+                    >
+                      <div>{tech.name}</div>
+                      <span className="text-[10px] text-slate-500 font-mono font-normal block">
+                        {lanes.length > 1 ? `${lanes.length} Concurrent Lanes` : '1 Test Lane'}
+                      </span>
+                    </td>
+                  )}
+
+                  {calendarDays.slice(0, 30).map((day) => {
+                    const isOff = tech.holidays.includes(day.dateStr);
+                    if (isOff) {
+                      return (
+                        <td
+                          key={day.dateStr}
+                          className="bg-amber-200 text-amber-900 font-bold text-center text-[9px] border-r border-slate-200"
+                          title={`${tech.name} on Holiday / Off-day (${day.dateStr})`}
+                        >
+                          OFF
+                        </td>
+                      );
+                    }
+
+                    if (day.isWeekend) {
+                      return <td key={day.dateStr} className="bg-slate-100 border-r border-slate-200" />;
+                    }
+
+                    if (testItem) {
+                      const testAlloc = testItem.unitAllocations[0];
+                      const endDate = testAlloc ? testAlloc.endDate : testItem.startDate;
+                      const isActiveOnDay = day.dateStr >= testItem.startDate && day.dateStr <= endDate;
+
+                      if (isActiveOnDay) {
+                        return (
+                          <td
+                            key={day.dateStr}
+                            style={{ backgroundColor: testItem.color || '#2563eb' }}
+                            className="text-white text-center text-[9px] font-bold border-r border-slate-200 truncate p-0.5"
+                            title={`Test: ${testItem.name}\nComments: ${testItem.testComments || 'None'}\nDates: ${testItem.startDate} to ${endDate}`}
+                          >
+                            <span className="truncate block">{testItem.name}</span>
+                          </td>
+                        );
+                      }
+                    }
+
                     return (
                       <td
                         key={day.dateStr}
-                        className="bg-amber-200 text-amber-900 font-bold text-center text-[9px] border-r border-slate-200"
-                        title={`${tech.name} on Holiday / Off-day (${day.dateStr})`}
+                        className="bg-emerald-50/60 text-emerald-700 text-center text-[10px] font-semibold border-r border-slate-200"
+                        title={`${tech.name} Available`}
                       >
-                        OFF
+                        ✓
                       </td>
                     );
-                  }
-
-                  if (day.isWeekend) {
-                    return <td key={day.dateStr} className="bg-slate-100 border-r border-slate-200" />;
-                  }
-
-                  return (
-                    <td
-                      key={day.dateStr}
-                      className="bg-emerald-50 text-emerald-800 text-center text-[10px] font-semibold border-r border-slate-200"
-                      title={`${tech.name} Available`}
-                    >
-                      ✓
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+                  })}
+                </tr>
+              ));
+            })}
           </tbody>
         </table>
       </div>

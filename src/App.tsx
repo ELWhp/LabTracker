@@ -584,6 +584,7 @@ export function App() {
         }}
         labs={labs}
         stations={stations}
+        resources={resources}
         testTypes={testTypes}
         defaultStartDate={prefilledStartDate || startDateStr}
         prefilledStationId={prefilledStationId}

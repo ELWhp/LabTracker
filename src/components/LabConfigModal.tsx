@@ -451,7 +451,33 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
                       <span>{station.name} ({lab?.name})</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="font-semibold text-slate-600 block mb-1">Station Number (Unique per Lab):</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={99}
+                          value={station.stationNumber}
+                          onChange={(e) => {
+                            const newNum = parseInt(e.target.value) || 1;
+                            const hasDuplicate = localStations.some(
+                              (s) => s.labId === station.labId && s.id !== station.id && s.stationNumber === newNum
+                            );
+                            if (hasDuplicate) {
+                              alert(`Station number ${newNum} is already assigned in ${lab?.name}. Station numbers must be unique within each lab!`);
+                              return;
+                            }
+                            setLocalStations(
+                              localStations.map((s) =>
+                                s.id === station.id ? { ...s, stationNumber: newNum } : s
+                              )
+                            );
+                          }}
+                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs font-mono text-center font-bold"
+                        />
+                      </div>
+
                       <div>
                         <label className="font-semibold text-slate-600 block mb-1">Station Name:</label>
                         <input

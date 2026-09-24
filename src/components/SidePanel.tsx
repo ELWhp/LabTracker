@@ -50,9 +50,29 @@ export const SidePanel: React.FC<SidePanelProps> = ({
 
       {/* Body Content */}
       <div className="flex-1 p-5 overflow-y-auto space-y-5 text-xs text-slate-700">
-        {/* Test Owner & VR Info */}
+        {/* Test Comments & Assigned Technician */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
-          <div className="flex items-center justify-between">
+          <div>
+            <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider block mb-1">
+              Assigned Technician
+            </span>
+            <span className="font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded text-xs">
+              {test.assignedTechName || 'Auto-Assigned'}
+            </span>
+          </div>
+
+          {test.testComments && (
+            <div className="border-t pt-2">
+              <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider block mb-1">
+                Test Comments & Details
+              </span>
+              <p className="text-xs text-slate-800 italic bg-white p-2 rounded border border-slate-200">
+                "{test.testComments}"
+              </p>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between border-t pt-2">
             <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider flex items-center gap-1">
               <User className="h-3 w-3 text-blue-500" /> Test Owner
             </span>

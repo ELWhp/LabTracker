@@ -79,6 +79,8 @@ export interface LabTest {
   labType: LabType;
   startDate: string;
   notes?: string;
+  testComments?: string;
+  assignedTechName?: string;
   unitAllocations: UnitAllocation[];
   testOwner?: string;
   vrNumber?: string;
