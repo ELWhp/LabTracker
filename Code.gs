@@ -6,6 +6,7 @@
  * 2. Concurrency Lock: Uses LockService (LockService.getScriptLock()) to prevent race conditions when multiple team members edit at once.
  * 3. Version History: Appends timestamped version snapshots on each save for full audit trail & version restore.
  * 4. Notifications: Uses MailApp.sendEmail to alert test owners when another team member modifies their scheduled tests.
+ * 5. Auto User Detection: Session.getActiveUser().getEmail() automatically identifies the logged-in user's Google account.
  */
 
 function doGet(e) {
@@ -14,6 +15,19 @@ function doGet(e) {
     .setTitle('Lab Tracker & Resource Management')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Automatically retrieve active Google Workspace user email
+ */
+function getUserEmail() {
+  try {
+    var email = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail();
+    return email || '';
+  } catch (err) {
+    Logger.log('Could not get active user email: ' + err.toString());
+    return '';
+  }
 }
 
 /**
@@ -76,7 +90,7 @@ function saveLabTrackerData(payload, userEmail, saveNote) {
 
     var props = PropertiesService.getScriptProperties();
     var timestamp = new Date().toLocaleString();
-    var currentUser = userEmail || Session.getActiveUser().getEmail() || 'Team Member';
+    var currentUser = userEmail || getUserEmail() || 'Team Member';
 
     // 1. Update current schedule payload
     props.setProperty('LAB_TRACKER_DATA', JSON.stringify(payload));

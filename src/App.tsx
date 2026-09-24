@@ -76,6 +76,19 @@ export function App() {
 
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('user@labcompany.com');
 
+  // Automatically detect user Google account email when running in Google Apps Script
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).google?.script?.run) {
+      (window as any).google.script.run
+        .withSuccessHandler((email: string) => {
+          if (email && email.trim()) {
+            setCurrentUserEmail(email.trim());
+          }
+        })
+        .getUserEmail();
+    }
+  }, []);
+
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [historyVersions, setHistoryVersions] = useState<HistoryVersion[]>(() => {
     const saved = localStorage.getItem('labtracker_history_versions');
@@ -506,10 +519,10 @@ export function App() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="font-semibold text-slate-700">Days to View (Multi-Year):</label>
+                  <label className="font-semibold text-slate-700">Days to View (Max 1 Year):</label>
                   <select
                     value={daysCount}
-                    onChange={(e) => setDaysCount(parseInt(e.target.value) || 30)}
+                    onChange={(e) => setDaysCount(Math.min(365, parseInt(e.target.value) || 30))}
                     className="px-2.5 py-1 border border-slate-300 rounded text-xs bg-white font-mono"
                   >
                     <option value={14}>14 Days (2 Weeks)</option>
@@ -517,9 +530,7 @@ export function App() {
                     <option value={60}>60 Days (2 Months)</option>
                     <option value={90}>90 Days (Quarter)</option>
                     <option value={180}>180 Days (6 Months)</option>
-                    <option value={365}>365 Days (1 Year)</option>
-                    <option value={730}>730 Days (2 Years)</option>
-                    <option value={1825}>1825 Days (5 Years)</option>
+                    <option value={365}>365 Days (1 Year Max)</option>
                   </select>
                 </div>
               </div>
