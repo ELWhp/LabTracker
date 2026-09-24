@@ -46,6 +46,13 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 }) => {
   const testMap = new Map<string, LabTest>(tests.map((t) => [t.id, t]));
 
+  // Resizable column width states
+  const [labColWidth, setLabColWidth] = useState<number>(320); // Column 1 width in px
+  const [stationColWidth, setStationColWidth] = useState<number>(240); // Column 2 width in px
+
+  const [isResizingCol1, setIsResizingCol1] = useState(false);
+  const [isResizingCol2, setIsResizingCol2] = useState(false);
+
   // Active popup comment state for Lab or Station
   const [activeCommentPopup, setActiveCommentPopup] = useState<{
     type: 'lab' | 'station';
@@ -56,6 +63,36 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
   } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Handle column 1 and column 2 resizing drag events
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizingCol1 && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const newWidth = Math.max(160, Math.min(600, e.clientX - rect.left));
+        setLabColWidth(newWidth);
+      } else if (isResizingCol2 && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const newWidth = Math.max(140, Math.min(600, e.clientX - rect.left - labColWidth));
+        setStationColWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingCol1(false);
+      setIsResizingCol2(false);
+    };
+
+    if (isResizingCol1 || isResizingCol2) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizingCol1, isResizingCol2, labColWidth]);
 
   // Close popup when clicking outside
   useEffect(() => {
@@ -204,10 +241,16 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       <table className="min-w-full border-collapse text-xs select-none">
         <thead>
           <tr className="bg-slate-800 text-white font-semibold text-center border-b border-slate-700">
-            <th className="px-3 py-2 sticky left-0 bg-slate-800 z-20 border-r border-slate-700 w-80 min-w-[320px] text-left">
+            <th
+              style={{ width: labColWidth }}
+              className="px-3 py-2 sticky left-0 bg-slate-800 z-20 border-r border-slate-700 text-left relative"
+            >
               Timeline / Year
             </th>
-            <th className="px-3 py-2 sticky left-80 bg-slate-800 z-20 border-r border-slate-700 w-60 min-w-[240px] text-left" />
+            <th
+              style={{ left: labColWidth, width: stationColWidth }}
+              className="px-3 py-2 sticky bg-slate-800 z-20 border-r border-slate-700 text-left"
+            />
             {yearSpans.map((y, idx) => (
               <th key={idx} colSpan={y.colSpan} className="px-2 py-1 border-r border-slate-700">
                 {y.year}
@@ -216,10 +259,16 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           </tr>
 
           <tr className="bg-slate-700 text-white font-medium text-center border-b border-slate-600">
-            <th className="px-3 py-1.5 sticky left-0 bg-slate-700 z-20 border-r border-slate-600 w-80 min-w-[320px] text-left">
+            <th
+              style={{ width: labColWidth }}
+              className="px-3 py-1.5 sticky left-0 bg-slate-700 z-20 border-r border-slate-600 text-left"
+            >
               Month
             </th>
-            <th className="px-3 py-1.5 sticky left-80 bg-slate-700 z-20 border-r border-slate-600 w-60 min-w-[240px] text-left" />
+            <th
+              style={{ left: labColWidth, width: stationColWidth }}
+              className="px-3 py-1.5 sticky bg-slate-700 z-20 border-r border-slate-600 text-left"
+            />
             {monthSpans.map((m, idx) => (
               <th key={idx} colSpan={m.colSpan} className="px-2 py-1 border-r border-slate-600">
                 {m.monthName}
@@ -228,10 +277,16 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           </tr>
 
           <tr className="bg-slate-600 text-slate-100 font-medium text-center border-b border-slate-500">
-            <th className="px-3 py-1 sticky left-0 bg-slate-600 z-20 border-r border-slate-500 w-80 min-w-[320px] text-left">
+            <th
+              style={{ width: labColWidth }}
+              className="px-3 py-1 sticky left-0 bg-slate-600 z-20 border-r border-slate-500 text-left"
+            >
               Week
             </th>
-            <th className="px-3 py-1 sticky left-80 bg-slate-600 z-20 border-r border-slate-500 w-60 min-w-[240px] text-left" />
+            <th
+              style={{ left: labColWidth, width: stationColWidth }}
+              className="px-3 py-1 sticky bg-slate-600 z-20 border-r border-slate-500 text-left"
+            />
             {weekSpans.map((w, idx) => (
               <th key={idx} colSpan={w.colSpan} className="px-1 py-1 border-r border-slate-500">
                 W{w.weekNumber}
@@ -240,12 +295,44 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           </tr>
 
           <tr className="bg-slate-100 text-slate-700 font-bold text-center border-b border-slate-300">
-            <th className="px-3 py-2 sticky left-0 bg-slate-200 z-20 border-r border-slate-300 w-80 min-w-[320px] text-left">
-              Lab & Comments
+            <th
+              style={{ width: labColWidth }}
+              className="px-3 py-2 sticky left-0 bg-slate-200 z-20 border-r border-slate-300 text-left relative group"
+            >
+              <div className="flex items-center justify-between">
+                <span>Lab & Comments</span>
+                <span className="text-[10px] text-slate-400 font-normal">↔ Resize</span>
+              </div>
+              {/* Resizer handle for Column 1 */}
+              <div
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  setIsResizingCol1(true);
+                }}
+                className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-blue-500/50 bg-transparent z-30"
+                title="Drag to resize Lab column width"
+              />
             </th>
-            <th className="px-3 py-2 sticky left-80 bg-slate-200 z-20 border-r border-slate-300 w-60 min-w-[240px] text-left">
-              Station & Capabilities
+
+            <th
+              style={{ left: labColWidth, width: stationColWidth }}
+              className="px-3 py-2 sticky bg-slate-200 z-20 border-r border-slate-300 text-left relative group"
+            >
+              <div className="flex items-center justify-between">
+                <span>Station & Capabilities</span>
+                <span className="text-[10px] text-slate-400 font-normal">↔ Resize</span>
+              </div>
+              {/* Resizer handle for Column 2 */}
+              <div
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  setIsResizingCol2(true);
+                }}
+                className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-blue-500/50 bg-transparent z-30"
+                title="Drag to resize Station column width"
+              />
             </th>
+
             {calendarDays.map((day) => {
               const landmarkOnDay = landmarks.find((lm) => lm.date === day.dateStr);
               return (
@@ -292,6 +379,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                           comments: lab.comments || 'No specific comments recorded for this lab.',
                         })
                       }
+                      style={{ width: labColWidth }}
                       className="px-3 py-3 sticky left-0 bg-slate-100 z-10 border-r border-slate-300 font-semibold text-slate-800 align-top shadow-xs cursor-pointer hover:bg-slate-200 transition-colors"
                       title="Click to view lab comments"
                     >
@@ -320,7 +408,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                         capabilities: station.capabilities,
                       })
                     }
-                    className="px-3 py-3 sticky left-80 bg-white z-10 border-r border-slate-300 align-top shadow-xs cursor-pointer hover:bg-slate-50 transition-colors"
+                    style={{ left: labColWidth, width: stationColWidth }}
+                    className="px-3 py-3 sticky bg-white z-10 border-r border-slate-300 align-top shadow-xs cursor-pointer hover:bg-slate-50 transition-colors"
                     title="Click to view station comments & capabilities"
                   >
                     <div className="flex items-center justify-between">
