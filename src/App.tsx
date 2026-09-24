@@ -24,12 +24,12 @@ import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { TechWorkloadView } from './components/TechWorkloadView';
 import { DataExportModal } from './components/DataExportModal';
 import { UserGuide } from './components/UserGuide';
+import { CustomLabGridIcon } from './components/CustomLabGridIcon';
 import {
   Plus,
   Settings,
   Calendar as CalendarIcon,
   Download,
-  FlaskConical,
   HelpCircle,
   Save,
   History,
@@ -347,11 +347,13 @@ export function App() {
       <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="bg-blue-600 p-2 rounded-lg">
-              <FlaskConical className="h-6 w-6 text-white" />
+            <div className="p-1 bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-center">
+              <CustomLabGridIcon size={40} />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight">Lab Tracker & Resource Manager</h1>
+              <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
+                Lab Tracker & Resource Manager
+              </h1>
               <p className="text-xs text-slate-400">
                 Multi-station timeline, station notes/capabilities, technician capacity & test edit history
               </p>
