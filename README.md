@@ -4,24 +4,95 @@ A web application designed for lab scheduling, station management, technician ca
 
 ---
 
-## 🚀 Step-by-Step Guide: Launching on Google Apps Script (Drive Scripts)
+## 🔰 Complete Beginner's Guide: Building & Deploying to Google Apps Script
 
-Follow these steps to deploy this Lab Tracker to Google Drive so everyone on your team can access and manage it:
+If you are completely new to coding, don't worry! Follow these step-by-step instructions to get everything set up from scratch on your computer.
 
-### Step 1: Create a Google Apps Script Project
-1. Go to [Google Drive](https://drive.google.com/) or [Google Apps Script](https://script.google.com/).
-2. Click **New** > **More** > **Google Apps Script** (or create a new standalone script).
-3. Name your project **"Lab Tracker & Resource Manager"**.
+---
 
-### Step 2: Add Backend Code (`Code.gs`)
-1. In the Apps Script editor, open the default `Code.gs` file.
-2. Replace all its content with the contents of `Code.gs` from this project repository.
-3. Save the file (`Ctrl + S` or `Cmd + S`).
+### Step 1: Install Required Software (One-Time Setup)
 
-### Step 3: Bundle & Add Frontend (`Index.html`)
-1. In the Apps Script editor, click **+** (Add a file) > **HTML** and name it `Index`.
-2. Run `npm run build` locally in this project to generate the production single-file build artifact (or copy `dist/index.html`).
-3. Paste the bundled HTML content into `Index.html` in Apps Script and save.
+To build the application on your computer, you need two standard, free tools installed:
+
+1. **Node.js** (This runs JavaScript tools on your computer):
+   * Go to **[https://nodejs.org](https://nodejs.org)**.
+   * Download the **LTS (Recommended for Most Users)** installer.
+   * Double-click the downloaded file and follow the default installation prompts (click *Next* -> *Next* -> *Finish*).
+2. **Git** (Required for downloading code repositories):
+   * Go to **[https://git-scm.com/downloads](https://git-scm.com/downloads)**.
+   * Download and run the installer for Windows or Mac with all default options selected.
+
+---
+
+### Step 2: Get the Project Files onto Your Computer
+
+#### **Option A: Using Git (Recommended)**
+1. Open Command Prompt (Windows) or Terminal (Mac).
+2. Run the following command:
+   ```bash
+   git clone <REPOSITORY_URL>
+   ```
+3. Change into the project directory:
+   ```bash
+   cd lab-tracker
+   ```
+
+#### **Option B: Downloading as a ZIP file**
+1. On the code repository page (e.g., GitHub or GitLab), click the green **Code** button and select **Download ZIP**.
+2. Unzip the file into a folder on your computer (for example, `C:\LabTracker` or `Desktop/LabTracker`).
+
+---
+
+### Step 3: Open the Terminal in the Project Folder
+
+* **Windows:**
+  1. Open File Explorer and navigate to the folder where the project files are located.
+  2. Click on the address bar at the top of the folder window.
+  3. Type `cmd` and press **Enter**. A black command line window will open directly inside your project folder.
+* **Mac:**
+  1. Open Finder and locate the project folder.
+  2. Right-click the folder and select **"New Terminal at Folder"** (or open Terminal app and type `cd ` followed by dragging the folder into the terminal window, then press Enter).
+
+---
+
+### Step 4: Run the Commands in the Terminal
+
+Inside the terminal window that just opened, type the following commands **one by one**:
+
+#### 1. Install Dependencies
+Type the following command and press **Enter**:
+```bash
+npm install
+```
+* **What this does:** It automatically downloads all required helper packages (React, Tailwind CSS, icons, etc.) needed by the application. This takes about 10–30 seconds.
+
+#### 2. Build the Application
+Type the following command and press **Enter**:
+```bash
+npm run build
+```
+* **What this does:** It compiles all application code, styles, and logic into **one single HTML file** (`dist/index.html`) that Google Apps Script can run.
+* When finished, you will see a message like `✓ built in ...` and a new folder named `dist` will appear in your project directory.
+
+---
+
+### Step 5: Add Code to Google Apps Script
+
+1. Open your browser and go to **[Google Drive](https://drive.google.com/)** or **[script.google.com](https://script.google.com/)**.
+2. Click **New** > **More** > **Google Apps Script**.
+3. Name your project **"Lab Tracker"** at the top left.
+
+#### A. Add Backend Code (`Code.gs`)
+1. In the left menu of Apps Script, click on `Code.gs`.
+2. Delete any default code inside it.
+3. Open the `Code.gs` file from the project repository on your computer in Notepad or any text editor, select all text (`Ctrl + A` or `Cmd + A`), copy it (`Ctrl + C` or `Cmd + C`), and paste it (`Ctrl + V` or `Cmd + V`) into Apps Script's `Code.gs`.
+
+#### B. Add Frontend Code (`Index.html`)
+1. In Apps Script, click the **`+` (Plus)** button next to **Files** on the left menu and select **HTML**.
+2. Name the file **`Index`** (Google will automatically add `.html`).
+3. On your computer, open the newly generated file inside the project folder at **`dist/index.html`** using Notepad, TextEdit, or VS Code.
+4. Select all text (`Ctrl + A` or `Cmd + A`), copy it (`Ctrl + C`), and paste it (`Ctrl + V`) into the `Index.html` file in Google Apps Script.
+5. Click the **Disk icon (Save)** or press `Ctrl + S`.
 
 ### Step 4: Deploy as a Web App for Team Usage
 1. In the top right corner of the Apps Script editor, click **Deploy** > **New deployment**.

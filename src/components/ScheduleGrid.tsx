@@ -203,11 +203,15 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                     )}
                   </td>
 
-                  {calendarDays.map((day) => {
+                  {calendarDays.map((day, dayIdx) => {
                     const stationAllocations = allocationsByStation.get(station.id) || [];
-                    const allocStartingHere = stationAllocations.find(
-                      ({ alloc }) => alloc.startDate === day.dateStr
-                    );
+
+                    // Check if allocation starts on this day OR if it started before calendar start and today is day 0
+                    const allocStartingHere = stationAllocations.find(({ alloc }) => {
+                      if (alloc.startDate === day.dateStr) return true;
+                      if (dayIdx === 0 && alloc.startDate < day.dateStr && alloc.endDate >= day.dateStr) return true;
+                      return false;
+                    });
 
                     const isCoveredByAlloc = stationAllocations.some(
                       ({ alloc }) =>
@@ -216,9 +220,13 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 
                     if (allocStartingHere) {
                       const { alloc, test } = allocStartingHere;
-                      const startIndex = calendarDays.findIndex((d) => d.dateStr === alloc.startDate);
-                      const endIndex = calendarDays.findIndex((d) => d.dateStr === alloc.endDate);
-                      const colSpan = endIndex >= startIndex ? endIndex - startIndex + 1 : 1;
+                      let startIndex = calendarDays.findIndex((d) => d.dateStr === alloc.startDate);
+                      let endIndex = calendarDays.findIndex((d) => d.dateStr === alloc.endDate);
+
+                      if (startIndex < 0) startIndex = 0;
+                      if (endIndex < 0) endIndex = calendarDays.length - 1;
+
+                      const colSpan = Math.max(1, endIndex - startIndex + 1);
 
                       const isSelected = selectedAllocationId === alloc.id;
 
