@@ -18,54 +18,48 @@ export const ResourceAlertBanner: React.FC<ResourceAlertBannerProps> = ({ issues
   }, [notifyOnModification]);
 
   return (
-    <div className="w-full max-w-4xl mx-auto my-3 space-y-2">
-      {/* Top Banner Control: Email Notification Preference Checkbox */}
-      <div className="bg-slate-800 text-slate-200 text-xs px-4 py-2 rounded-lg flex items-center justify-between border border-slate-700 shadow-xs">
-        <label className="flex items-center gap-2 cursor-pointer select-none font-semibold text-slate-200 hover:text-white">
+    <div className="w-full mx-auto space-y-1 text-xs">
+      {/* Sleek 1-Line Email Notification Toggle Banner */}
+      <div className="bg-slate-800 text-slate-200 px-3.5 py-1.5 rounded-md flex items-center justify-between border border-slate-700 shadow-2xs">
+        <label className="flex items-center gap-2 cursor-pointer select-none font-medium text-slate-200 hover:text-white">
           <input
             type="checkbox"
             checked={notifyOnModification}
             onChange={(e) => setNotifyOnModification(e.target.checked)}
-            className="w-4 h-4 text-blue-600 rounded border-slate-600 focus:ring-blue-500"
+            className="w-3.5 h-3.5 text-blue-600 rounded border-slate-600 focus:ring-blue-500"
           />
-          <span className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1.5 text-[11px]">
             {notifyOnModification ? (
-              <Bell className="h-3.5 w-3.5 text-emerald-400" />
+              <Bell className="h-3 w-3 text-emerald-400" />
             ) : (
-              <BellOff className="h-3.5 w-3.5 text-slate-400" />
+              <BellOff className="h-3 w-3 text-slate-400" />
             )}
             Send me email notifications when my scheduled tests are modified by another team member
           </span>
         </label>
 
         <span className="text-[10px] text-slate-400 font-mono">
-          {notifyOnModification ? 'Notifications Enabled ✓' : 'Notifications Disabled'}
+          {notifyOnModification ? 'Notifications On ✓' : 'Off'}
         </span>
       </div>
 
-      {/* Resource Allocation Deficit Warning Banner */}
+      {/* Vertically Compact Resource Allocation Conflict Banner */}
       {issues.length > 0 && (
-        <div className="bg-amber-50 border-l-4 border-amber-500 rounded-r-md p-3.5 shadow-sm text-slate-800">
-          <div className="flex items-start space-x-3">
-            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
-            <div className="flex-1 text-sm">
-              <h4 className="font-bold text-amber-900 mb-1 flex items-center">
-                Resource Allocation Issues Detected
-              </h4>
-              <div className="space-y-1">
-                {issues.map((issue, index) => (
-                  <div key={index} className="flex items-center text-xs text-amber-800">
-                    <AlertCircle className="h-3.5 w-3.5 text-amber-600 mr-1.5 shrink-0" />
-                    <span>
-                      Resource allocation issue between <strong className="font-semibold">{issue.startDate}</strong> and{' '}
-                      <strong className="font-semibold">{issue.endDate}</strong> in{' '}
-                      <strong className="font-semibold">{LAB_TYPE_LABELS[issue.labType] || issue.labType}</strong>: required demand is{' '}
-                      <span className="font-bold text-amber-900">{issue.demand}</span> tech resources, but only{' '}
-                      <span className="font-bold text-amber-900">{issue.capacity}</span> available.
-                    </span>
-                  </div>
-                ))}
-              </div>
+        <div className="bg-amber-50 border-l-4 border-amber-500 rounded-r-md px-3 py-2 shadow-2xs text-slate-800">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+            <div className="flex-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="font-bold text-amber-900 shrink-0 text-xs">
+                Resource Shortages:
+              </span>
+              {issues.map((issue, index) => (
+                <div key={index} className="flex items-center text-[11px] text-amber-900 font-medium">
+                  <AlertCircle className="h-3 w-3 text-amber-600 mr-1 shrink-0" />
+                  <span>
+                    <strong className="font-bold">{issue.startDate}</strong> to <strong className="font-bold">{issue.endDate}</strong> ({LAB_TYPE_LABELS[issue.labType] || issue.labType}): req <strong className="text-amber-950">{issue.demand}</strong> tech(s), only <strong className="text-amber-950">{issue.capacity}</strong> available.
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

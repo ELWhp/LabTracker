@@ -24,7 +24,6 @@ import { SidePanel } from './components/SidePanel';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { TechWorkloadView } from './components/TechWorkloadView';
 import { DataExportModal } from './components/DataExportModal';
-import { UserGuide } from './components/UserGuide';
 import { CustomLabGridIcon } from './components/CustomLabGridIcon';
 import {
   Plus,
@@ -37,7 +36,6 @@ import {
   AlertTriangle,
   Users,
   LayoutGrid,
-  BookOpen,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -112,7 +110,6 @@ export function App() {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [selectedAllocationId, setSelectedAllocationId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -367,39 +364,67 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
-      {/* Navbar Header */}
+      {/* Compact Main Navbar Header */}
       <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+        <div className="max-w-[98%] w-full mx-auto px-4 py-2.5 flex items-center justify-between gap-4">
+          <div className="flex items-center space-x-3 shrink-0">
             <div className="p-1 bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-center">
-              <CustomLabGridIcon size={40} />
+              <CustomLabGridIcon size={36} />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
+              <h1 className="text-base font-bold tracking-tight leading-none">
                 Lab Tracker & Resource Manager
               </h1>
-              <p className="text-xs text-slate-400">
+              <p className="text-[11px] text-slate-400 mt-0.5">
                 Multi-station timeline, station notes/capabilities, technician capacity & test edit history
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <div className="hidden md:flex items-center gap-1.5 mr-2 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 text-xs">
-              <Users className="h-3.5 w-3.5 text-blue-400" />
-              <span className="text-slate-400 text-[11px]">User:</span>
+          {/* Integrated Navigation View Tabs */}
+          <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700 space-x-1 shrink-0">
+            <button
+              onClick={() => setActiveTab('labs')}
+              className={`px-3 py-1.5 font-bold text-xs rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'labs'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Labs View
+            </button>
+
+            <button
+              onClick={() => setActiveTab('techs')}
+              className={`px-3 py-1.5 font-bold text-xs rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'techs'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+              }`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Techs Workload
+            </button>
+          </div>
+
+          {/* Action Buttons & Full User Input */}
+          <div className="flex items-center space-x-2 shrink-0">
+            <div className="flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
+              <Users className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+              <span className="text-slate-400 text-[11px] shrink-0">User:</span>
               <input
                 type="text"
                 value={currentUserEmail}
                 onChange={(e) => setCurrentUserEmail(e.target.value)}
-                className="bg-transparent text-white font-mono text-xs focus:outline-none w-36"
+                className="bg-transparent text-white font-mono text-xs focus:outline-none min-w-[220px] w-64"
                 title="Current active user for edit audit logging & owner notices"
               />
             </div>
 
             <button
               onClick={handleSaveChanges}
-              className={`px-3.5 py-2 font-semibold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 font-semibold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer ${
                 hasUnsavedChanges
                   ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold animate-pulse'
                   : 'bg-emerald-600 hover:bg-emerald-500 text-white'
@@ -410,7 +435,7 @@ export function App() {
 
             <button
               onClick={() => setIsHistoryModalOpen(true)}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <History className="h-4 w-4 text-blue-400" /> Version History
             </button>
@@ -421,75 +446,38 @@ export function App() {
                 setPrefilledStartDate(undefined);
                 setIsAddModalOpen(true);
               }}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Plus className="h-4 w-4" /> Add Test
             </button>
 
             <button
               onClick={() => setIsConfigModalOpen(true)}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Settings className="h-4 w-4 text-slate-400" /> Config Labs & Techs
             </button>
 
             <button
               onClick={() => setIsExportModalOpen(true)}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
               title="Export Database Tables (Tests, Labs, Techs, Stations)"
             >
               <Download className="h-4 w-4 text-emerald-400" /> Export Tables
-            </button>
-
-            <button
-              onClick={() => setIsGuideOpen(true)}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-blue-400 text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 font-semibold transition-colors cursor-pointer"
-              title="Open End User Guide"
-            >
-              <BookOpen className="h-4 w-4 text-blue-400" /> User Guide
-            </button>
-          </div>
-        </div>
-
-        {/* Top Navigation Tabs: Labs vs Techs */}
-        <div className="bg-slate-800 px-4 border-t border-slate-700 flex items-center justify-between">
-          <div className="flex space-x-1">
-            <button
-              onClick={() => setActiveTab('labs')}
-              className={`px-4 py-2 font-semibold text-xs flex items-center gap-2 border-b-2 transition-colors cursor-pointer ${
-                activeTab === 'labs'
-                  ? 'border-blue-500 text-white bg-slate-700/50'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <LayoutGrid className="h-4 w-4 text-blue-400" />
-              Labs View (Schedule Grid)
-            </button>
-
-            <button
-              onClick={() => setActiveTab('techs')}
-              className={`px-4 py-2 font-semibold text-xs flex items-center gap-2 border-b-2 transition-colors cursor-pointer ${
-                activeTab === 'techs'
-                  ? 'border-blue-500 text-white bg-slate-700/50'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Users className="h-4 w-4 text-emerald-400" />
-              Techs Workload View
             </button>
           </div>
         </div>
 
         {/* Top Warning Banner for Unsaved Changes */}
         {hasUnsavedChanges && (
-          <div className="bg-amber-400 text-amber-950 text-xs font-semibold px-4 py-2 flex items-center justify-between border-t border-amber-500">
+          <div className="bg-amber-400 text-amber-950 text-xs font-semibold px-4 py-1.5 flex items-center justify-between border-t border-amber-500">
             <span className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-950 shrink-0" />
               You have unsaved changes! If you exit or reload without saving, your changes will be lost.
             </span>
             <button
               onClick={handleSaveChanges}
-              className="bg-amber-950 text-white px-2.5 py-1 rounded text-[11px] hover:bg-amber-900 font-bold cursor-pointer"
+              className="bg-amber-950 text-white px-2.5 py-0.5 rounded text-[11px] hover:bg-amber-900 font-bold cursor-pointer"
             >
               Save Now
             </button>
@@ -497,15 +485,15 @@ export function App() {
         )}
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 space-y-4">
-        {/* Upper-Middle Resource Allocation Notification Banner */}
+      {/* Main Content Area filling ~98% PC Screen Width */}
+      <main className="flex-1 max-w-[98%] w-full mx-auto p-3 space-y-3">
+        {/* Sleek Vertically Compact Resource Allocation Banner */}
         <ResourceAlertBanner issues={resourceIssues} />
 
         {activeTab === 'labs' ? (
           <>
             {/* Timeline Control Bar */}
-            <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-xs flex items-center justify-between text-xs">
+            <div className="bg-white border border-slate-200 rounded-lg p-2.5 shadow-xs flex items-center justify-between text-xs">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <CalendarIcon className="h-4 w-4 text-slate-500" />
@@ -555,7 +543,7 @@ export function App() {
               onDoubleClickCell={handleDoubleClickCell}
             />
 
-            {/* Monitoring Table */}
+            {/* Monitoring Table with Chronogram covering ~90% screen width */}
             <MonitoringTable
               tests={tests}
               testTypes={testTypes}
@@ -646,11 +634,6 @@ export function App() {
         tests={tests}
         testTypes={testTypes}
         landmarks={landmarks}
-      />
-
-      <UserGuide
-        isOpen={isGuideOpen}
-        onClose={() => setIsGuideOpen(false)}
       />
     </div>
   );

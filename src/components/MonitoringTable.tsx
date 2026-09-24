@@ -81,7 +81,7 @@ export const MonitoringTable: React.FC<MonitoringTableProps> = ({
         <table className="min-w-full border-collapse text-xs">
           <thead>
             <tr className="bg-slate-100 text-slate-700 font-bold text-left border-b border-slate-300">
-              <th className="px-3 py-2 min-w-[380px] w-[55%]">Chronogram Timeline</th>
+              <th className="px-3 py-2 min-w-[600px] w-[88%]">Chronogram Timeline (90% Width)</th>
               <th className="px-3 py-2">Test Name</th>
               <th className="px-3 py-2">Test Comments</th>
               <th className="px-3 py-2">Assigned Tech</th>
