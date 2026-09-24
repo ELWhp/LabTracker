@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import type { Lab, Station, PersonnelResource, TestTypeConfig, StationCapability } from '../types/labTracker';
+import type { Lab, Station, PersonnelResource, TestTypeConfig, StationCapability, Landmark } from '../types/labTracker';
 import { DEFAULT_TEST_TYPES } from '../types/labTracker';
-import { X, Plus, Trash2, Settings, Users, Cpu, FileText } from 'lucide-react';
+import { X, Plus, Trash2, Settings, Users, Cpu, FileText, Flag } from 'lucide-react';
 
 interface LabConfigModalProps {
   isOpen: boolean;
@@ -10,9 +10,11 @@ interface LabConfigModalProps {
   stations: Station[];
   resources: PersonnelResource[];
   testTypes?: TestTypeConfig[];
+  landmarks?: Landmark[];
   onUpdateLabsAndStations: (labs: Lab[], stations: Station[]) => void;
   onUpdateResources: (resources: PersonnelResource[]) => void;
   onUpdateTestTypes?: (testTypes: TestTypeConfig[]) => void;
+  onUpdateLandmarks?: (landmarks: Landmark[]) => void;
 }
 
 export const LabConfigModal: React.FC<LabConfigModalProps> = ({
@@ -22,16 +24,29 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
   stations,
   resources,
   testTypes = DEFAULT_TEST_TYPES,
+  landmarks = [],
   onUpdateLabsAndStations,
   onUpdateResources,
   onUpdateTestTypes,
+  onUpdateLandmarks,
 }) => {
-  const [activeTab, setActiveTab] = useState<'labs' | 'testTypes' | 'stations' | 'techs'>('labs');
+  const [activeTab, setActiveTab] = useState<'labs' | 'testTypes' | 'stations' | 'techs' | 'landmarks'>('labs');
 
   const [localLabs, setLocalLabs] = useState<Lab[]>(labs);
   const [localStations, setLocalStations] = useState<Station[]>(stations);
   const [localResources, setLocalResources] = useState<PersonnelResource[]>(resources);
   const [localTestTypes, setLocalTestTypes] = useState<TestTypeConfig[]>(testTypes);
+  const [localLandmarks, setLocalLandmarks] = useState<Landmark[]>(landmarks);
+
+  // Landmark inputs
+  const [newLandmarkName, setNewLandmarkName] = useState('');
+  const [newLandmarkDate, setNewLandmarkDate] = useState(() => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  });
 
   // New item inputs
   const [newLabName, setNewLabName] = useState('');
@@ -52,7 +67,25 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
     if (onUpdateTestTypes) {
       onUpdateTestTypes(localTestTypes);
     }
+    if (onUpdateLandmarks) {
+      onUpdateLandmarks(localLandmarks);
+    }
     onClose();
+  };
+
+  const handleAddLandmark = () => {
+    if (!newLandmarkName.trim() || !newLandmarkDate) return;
+    const newLm: Landmark = {
+      id: `lm-${Date.now()}`,
+      name: newLandmarkName.trim(),
+      date: newLandmarkDate,
+    };
+    setLocalLandmarks([...localLandmarks, newLm]);
+    setNewLandmarkName('');
+  };
+
+  const handleDeleteLandmark = (lmId: string) => {
+    setLocalLandmarks(localLandmarks.filter((lm) => lm.id !== lmId));
   };
 
   const handleAddLab = () => {
@@ -147,10 +180,11 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
         {/* Tab Navigation */}
         <div className="flex border-b border-slate-200 gap-2">
           {[
-            { key: 'labs', label: 'Labs & Supported Types', icon: FileText },
-            { key: 'testTypes', label: 'Custom Test Types', icon: Settings },
-            { key: 'stations', label: 'Stations & Capabilities', icon: Cpu },
-            { key: 'techs', label: 'Technicians & Qualifications', icon: Users },
+            { key: 'labs', label: 'Labs & Types', icon: FileText },
+            { key: 'testTypes', label: 'Test Types', icon: Settings },
+            { key: 'stations', label: 'Stations', icon: Cpu },
+            { key: 'techs', label: 'Technicians', icon: Users },
+            { key: 'landmarks', label: 'Landmarks', icon: Flag },
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -268,6 +302,84 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
                         })}
                       </div>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: LANDMARKS & LAUNCH DATES */}
+          {activeTab === 'landmarks' && (
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                <h3 className="font-bold text-slate-800">Add Launch Landmark</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Landmark Name (e.g. 🚀 Product Launch)"
+                    value={newLandmarkName}
+                    onChange={(e) => setNewLandmarkName(e.target.value)}
+                    className="px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
+                  />
+                  <input
+                    type="date"
+                    value={newLandmarkDate}
+                    onChange={(e) => setNewLandmarkDate(e.target.value)}
+                    className="px-2.5 py-1.5 border border-slate-300 rounded font-mono text-xs bg-white"
+                  />
+                  <button
+                    onClick={handleAddLandmark}
+                    className="px-3 py-1.5 bg-blue-600 text-white font-bold rounded text-xs flex items-center gap-1 hover:bg-blue-500 cursor-pointer justify-center"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Landmark
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {localLandmarks.map((lm) => (
+                  <div key={lm.id} className="bg-white border border-slate-200 rounded-lg p-3 flex items-center justify-between">
+                    <div className="grid grid-cols-2 gap-3 flex-1 mr-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 block">Landmark Name:</label>
+                        <input
+                          type="text"
+                          value={lm.name}
+                          onChange={(e) => {
+                            setLocalLandmarks(
+                              localLandmarks.map((l) =>
+                                l.id === lm.id ? { ...l, name: e.target.value } : l
+                              )
+                            );
+                          }}
+                          className="w-full px-2 py-1 border border-slate-300 rounded font-sans text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 block">Landmark Date:</label>
+                        <input
+                          type="date"
+                          value={lm.date}
+                          onChange={(e) => {
+                            setLocalLandmarks(
+                              localLandmarks.map((l) =>
+                                l.id === lm.id ? { ...l, date: e.target.value } : l
+                              )
+                            );
+                          }}
+                          className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleDeleteLandmark(lm.id)}
+                      className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
+                      title="Delete Landmark"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 ))}
               </div>

@@ -5,6 +5,7 @@ import type {
   LabTest,
   UnitAllocation,
   TestTypeConfig,
+  Landmark,
 } from './types/labTracker';
 import type { HistoryVersion } from './types/history';
 import {
@@ -68,6 +69,11 @@ export function App() {
     return saved ? JSON.parse(saved) : createInitialMockData().tests;
   });
 
+  const [landmarks, setLandmarks] = useState<Landmark[]>(() => {
+    const saved = localStorage.getItem('labtracker_landmarks');
+    return saved ? JSON.parse(saved) : createInitialMockData().landmarks;
+  });
+
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('user@labcompany.com');
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
@@ -115,6 +121,10 @@ export function App() {
     localStorage.setItem('labtracker_test_types', JSON.stringify(testTypes));
   }, [testTypes]);
 
+  useEffect(() => {
+    localStorage.setItem('labtracker_landmarks', JSON.stringify(landmarks));
+  }, [landmarks]);
+
   const calendarDays = generateCalendarDays(startDateStr, daysCount);
   const resourceIssues = evaluateResourceAllocations(tests, resources, calendarDays, testTypes);
 
@@ -138,6 +148,7 @@ export function App() {
     localStorage.setItem('labtracker_resources', JSON.stringify(resources));
     localStorage.setItem('labtracker_tests', JSON.stringify(tests));
     localStorage.setItem('labtracker_test_types', JSON.stringify(testTypes));
+    localStorage.setItem('labtracker_landmarks', JSON.stringify(landmarks));
 
     const newVer: HistoryVersion = {
       id: `ver-${Date.now()}`,
@@ -524,6 +535,7 @@ export function App() {
               labs={labs}
               stations={stations}
               tests={tests}
+              landmarks={landmarks}
               calendarDays={calendarDays}
               selectedAllocationId={selectedAllocationId}
               onSelectAllocation={(alloc) => setSelectedAllocationId(alloc.id)}
@@ -586,6 +598,7 @@ export function App() {
         stations={stations}
         resources={resources}
         testTypes={testTypes}
+        landmarks={landmarks}
         onUpdateLabsAndStations={(l: Lab[], s: Station[]) => {
           setLabs(l);
           setStations(s);
@@ -597,6 +610,10 @@ export function App() {
         }}
         onUpdateTestTypes={(tt) => {
           setTestTypes(tt);
+          setHasUnsavedChanges(true);
+        }}
+        onUpdateLandmarks={(lm) => {
+          setLandmarks(lm);
           setHasUnsavedChanges(true);
         }}
       />
@@ -616,6 +633,7 @@ export function App() {
         resources={resources}
         tests={tests}
         testTypes={testTypes}
+        landmarks={landmarks}
       />
 
       <UserGuide

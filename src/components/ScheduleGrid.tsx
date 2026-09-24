@@ -5,6 +5,7 @@ import type {
   LabTest,
   UnitAllocation,
   CalendarDay,
+  Landmark,
 } from '../types/labTracker';
 import { LAB_TYPE_LABELS } from '../types/labTracker';
 import { addWorkingDays, addDays } from '../utils/labTrackerUtils';
@@ -14,6 +15,7 @@ interface ScheduleGridProps {
   labs: Lab[];
   stations: Station[];
   tests: LabTest[];
+  landmarks?: Landmark[];
   calendarDays: CalendarDay[];
   selectedAllocationId: string | null;
   onSelectAllocation: (allocation: UnitAllocation, test: LabTest) => void;
@@ -34,6 +36,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
   labs,
   stations,
   tests,
+  landmarks = [],
   calendarDays,
   selectedAllocationId,
   onSelectAllocation,
@@ -243,17 +246,30 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             <th className="px-3 py-2 sticky left-72 bg-slate-200 z-20 border-r border-slate-300 w-52 text-left">
               Station & Capabilities
             </th>
-            {calendarDays.map((day) => (
-              <th
-                key={day.dateStr}
-                className={`w-8 min-w-[32px] px-0.5 py-1 border-r border-slate-200 ${
-                  day.isWeekend ? 'bg-slate-200 text-slate-400' : 'bg-slate-50'
-                }`}
-                title={`${day.dateStr} (${day.monthName} ${day.dayOfMonth})`}
-              >
-                {day.dayOfMonth}
-              </th>
-            ))}
+            {calendarDays.map((day) => {
+              const landmarkOnDay = landmarks.find((lm) => lm.date === day.dateStr);
+              return (
+                <th
+                  key={day.dateStr}
+                  className={`w-8 min-w-[32px] px-0.5 py-1 border-r border-slate-200 relative ${
+                    day.isWeekend ? 'bg-slate-200 text-slate-400' : 'bg-slate-50'
+                  }`}
+                  title={`${day.dateStr} (${day.monthName} ${day.dayOfMonth})${
+                    landmarkOnDay ? ` - Landmark: ${landmarkOnDay.name}` : ''
+                  }`}
+                >
+                  {landmarkOnDay && (
+                    <div
+                      className="absolute -top-7 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap z-30"
+                      title={`Landmark Date: ${landmarkOnDay.name} (${landmarkOnDay.date})`}
+                    >
+                      {landmarkOnDay.name}
+                    </div>
+                  )}
+                  {day.dayOfMonth}
+                </th>
+              );
+            })}
           </tr>
         </thead>
 
@@ -342,6 +358,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                       ({ alloc }) => day.dateStr >= alloc.startDate && day.dateStr <= alloc.endDate
                     );
 
+                    const landmarkOnDay = landmarks.find((lm) => lm.date === day.dateStr);
+
                     if (allocStartingHere) {
                       const { alloc, test } = allocStartingHere;
                       let startIndex = calendarDays.findIndex((d) => d.dateStr === alloc.startDate);
@@ -361,6 +379,14 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                           onDrop={(e) => handleDrop(e, station.id, day.dateStr)}
                           className="p-1 border-r border-slate-200 align-middle relative h-12"
                         >
+                          {/* Vertical Landmark Launch Line */}
+                          {landmarkOnDay && (
+                            <div
+                              className="absolute top-0 bottom-0 right-0 w-1 bg-red-600 z-20 pointer-events-none shadow-sm"
+                              title={`Landmark: ${landmarkOnDay.name} (${landmarkOnDay.date})`}
+                            />
+                          )}
+
                           <div
                             draggable
                             onDragStart={(e) => handleDragStart(e, alloc)}
@@ -425,11 +451,19 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, station.id, day.dateStr)}
                         onDoubleClick={() => onDoubleClickCell && onDoubleClickCell(station.id, day.dateStr)}
-                        className={`border-r border-slate-200 transition-colors hover:bg-blue-100/60 cursor-pointer ${
+                        className={`border-r border-slate-200 transition-colors hover:bg-blue-100/60 cursor-pointer relative ${
                           day.isWeekend ? 'bg-slate-100/60' : ''
                         }`}
                         title="Double-click to add test starting on this date"
-                      />
+                      >
+                        {/* Vertical Landmark Launch Line */}
+                        {landmarkOnDay && (
+                          <div
+                            className="absolute top-0 bottom-0 right-0 w-1 bg-red-600 z-20 pointer-events-none shadow-sm"
+                            title={`Landmark: ${landmarkOnDay.name} (${landmarkOnDay.date})`}
+                          />
+                        )}
+                      </td>
                     );
                   })}
                 </tr>

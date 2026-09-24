@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Lab, Station, PersonnelResource, LabTest, TestTypeConfig } from '../types/labTracker';
+import type { Lab, Station, PersonnelResource, LabTest, TestTypeConfig, Landmark } from '../types/labTracker';
 import { Download, CheckSquare, Square, X } from 'lucide-react';
 
 interface DataExportModalProps {
@@ -10,6 +10,7 @@ interface DataExportModalProps {
   resources: PersonnelResource[];
   tests: LabTest[];
   testTypes: TestTypeConfig[];
+  landmarks?: Landmark[];
 }
 
 export const DataExportModal: React.FC<DataExportModalProps> = ({
@@ -20,6 +21,7 @@ export const DataExportModal: React.FC<DataExportModalProps> = ({
   resources,
   tests,
   testTypes,
+  landmarks = [],
 }) => {
   const [selectedTables, setSelectedTables] = useState<{
     tests: boolean;
@@ -27,12 +29,14 @@ export const DataExportModal: React.FC<DataExportModalProps> = ({
     stations: boolean;
     techs: boolean;
     testTypes: boolean;
+    landmarks: boolean;
   }>({
     tests: true,
     labs: true,
     stations: true,
     techs: true,
     testTypes: true,
+    landmarks: true,
   });
 
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
@@ -131,6 +135,14 @@ export const DataExportModal: React.FC<DataExportModalProps> = ({
       }));
     }
 
+    if (selectedTables.landmarks) {
+      dataMap['landmarks'] = landmarks.map((lm) => ({
+        id: lm.id,
+        name: lm.name,
+        date: lm.date,
+      }));
+    }
+
     if (exportFormat === 'json') {
       const jsonStr = JSON.stringify(dataMap, null, 2);
       downloadFile('lab_tracker_database_export.json', jsonStr, 'application/json');
@@ -169,6 +181,7 @@ export const DataExportModal: React.FC<DataExportModalProps> = ({
             { key: 'stations', label: `Stations Table (${stations.length} records)` },
             { key: 'techs', label: `Technicians List (${resources.length} records)` },
             { key: 'testTypes', label: `Test Types Config (${testTypes.length} records)` },
+            { key: 'landmarks', label: `Landmarks Table (${landmarks.length} records)` },
           ].map(({ key, label }) => {
             const isChecked = selectedTables[key as keyof typeof selectedTables];
             return (

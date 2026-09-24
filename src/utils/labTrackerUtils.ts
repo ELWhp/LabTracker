@@ -6,6 +6,7 @@ import type {
   CalendarDay,
   ResourceIssue,
   TestTypeConfig,
+  Landmark,
 } from '../types/labTracker';
 import { DEFAULT_TEST_TYPES } from '../types/labTracker';
 
@@ -349,7 +350,20 @@ export function createInitialMockData() {
     },
   ];
 
-  return { testTypes, labs, stations, resources, tests };
+  const landmarks: Landmark[] = [
+    {
+      id: 'lm-1',
+      name: '🚀 Product Launch v1.0',
+      date: addDays(baseDate, 10),
+    },
+    {
+      id: 'lm-2',
+      name: '📋 Compliance Audit Milestone',
+      date: addDays(baseDate, 20),
+    },
+  ];
+
+  return { testTypes, labs, stations, resources, tests, landmarks };
 }
 
 export function evaluateResourceAllocations(

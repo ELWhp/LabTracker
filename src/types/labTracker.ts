@@ -104,3 +104,9 @@ export interface ResourceIssue {
   demand: number;
   capacity: number;
 }
+
+export interface Landmark {
+  id: string;
+  name: string;
+  date: string;
+}
