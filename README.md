@@ -76,6 +76,23 @@ npm run build
 
 ---
 
+### ❓ Troubleshooting Common Beginner Errors
+
+#### Error: `'tsc' is not recognized as an internal or external command`
+* **Why this happens:** This happens if you skipped Step 1 (`npm install`) or if TypeScript hasn't been installed locally yet.
+* **How to fix it:**
+  1. Make sure you run `npm install` first!
+  2. Then run:
+     ```bash
+     npm run build
+     ```
+  3. Alternatively, you can run the direct Vite build command:
+     ```bash
+     npx vite build
+     ```
+
+---
+
 ### Step 5: Add Code to Google Apps Script
 
 1. Open your browser and go to **[Google Drive](https://drive.google.com/)** or **[script.google.com](https://script.google.com/)**.
