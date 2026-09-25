@@ -1,13 +1,17 @@
 import React from 'react';
 import type { PersonnelResource, LabTest, CalendarDay, TestTypeConfig } from '../types/labTracker';
 import { LAB_TYPE_LABELS } from '../types/labTracker';
-import { Users, Calendar, Award } from 'lucide-react';
+import { Users, Calendar as CalendarIcon, Award } from 'lucide-react';
 
 interface TechWorkloadViewProps {
   resources: PersonnelResource[];
   tests: LabTest[];
   calendarDays: CalendarDay[];
   testTypes: TestTypeConfig[];
+  startDateStr?: string;
+  daysCount?: number;
+  onStartDateChange?: (dateStr: string) => void;
+  onDaysCountChange?: (days: number) => void;
 }
 
 export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
@@ -15,6 +19,10 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
   tests,
   calendarDays,
   testTypes,
+  startDateStr,
+  daysCount,
+  onStartDateChange,
+  onDaysCountChange,
 }) => {
   const typeMap = new Map<string, string>(testTypes.map((tt) => [tt.id, tt.label]));
 
@@ -51,6 +59,46 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Timeline Controls Bar for Techs Workload View */}
+      {startDateStr !== undefined && onStartDateChange && (
+        <div className="bg-white border border-slate-200 rounded-lg p-2.5 shadow-xs flex items-center justify-between text-xs">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-slate-500" />
+              <label className="font-semibold text-slate-700">Timeline Start Date:</label>
+              <input
+                type="date"
+                value={startDateStr}
+                onChange={(e) => onStartDateChange(e.target.value)}
+                className="px-2.5 py-1 border border-slate-300 rounded text-xs font-mono"
+              />
+            </div>
+
+            {daysCount !== undefined && onDaysCountChange && (
+              <div className="flex items-center gap-2">
+                <label className="font-semibold text-slate-700">Days to View (Technician Agenda):</label>
+                <select
+                  value={daysCount}
+                  onChange={(e) => onDaysCountChange(Math.min(365, parseInt(e.target.value) || 30))}
+                  className="px-2.5 py-1 border border-slate-300 rounded text-xs bg-white font-mono"
+                >
+                  <option value={14}>14 Days (2 Weeks)</option>
+                  <option value={30}>30 Days (1 Month)</option>
+                  <option value={60}>60 Days (2 Months)</option>
+                  <option value={90}>90 Days (Quarter)</option>
+                  <option value={180}>180 Days (6 Months)</option>
+                  <option value={365}>365 Days (1 Year Max)</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="text-slate-500 italic text-[11px]">
+            Viewing {calendarDays.length} days of technician agenda & parallel test lanes
+          </div>
+        </div>
+      )}
+
       {/* Header Overview Card */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
         <div className="flex items-center justify-between mb-4">
@@ -116,7 +164,7 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
 
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1 flex items-center gap-1">
-                    <Calendar className="h-3 w-3 text-amber-500" /> Holiday / Scheduled Off-Days
+                    <CalendarIcon className="h-3 w-3 text-amber-500" /> Holiday / Scheduled Off-Days
                   </label>
                   <div className="flex flex-wrap gap-1">
                     {tech.holidays.map((h) => (
@@ -166,7 +214,7 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
       {/* Technician Timeline Schedule Heatmap with Multi-Level Year/Month/Week/Day Headers */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs overflow-x-auto">
         <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-blue-600" /> Technician Multi-Test Timeline across Full Range ({calendarDays.length} Days)
+          <CalendarIcon className="h-4 w-4 text-blue-600" /> Technician Multi-Test Agenda ({calendarDays.length} Days)
         </h3>
 
         <table className="w-full border-collapse text-xs select-none" style={{ tableLayout: 'fixed' }}>

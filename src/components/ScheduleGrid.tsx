@@ -290,10 +290,10 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 
         <thead>
           <tr className="bg-slate-800 text-white font-semibold text-center border-b border-slate-700">
-            <th style={col1Style} className="px-2 py-2 bg-slate-800 z-20 border-r border-slate-700 text-left">
+            <th style={col1Style} className="px-2 py-2 bg-slate-800 z-40 border-r border-slate-700 text-left">
               Timeline / Year
             </th>
-            <th style={col2Style} className="px-2 py-2 bg-slate-800 z-20 border-r border-slate-700 text-left" />
+            <th style={col2Style} className="px-2 py-2 bg-slate-800 z-40 border-r border-slate-700 text-left" />
             {yearSpans.map((y, idx) => (
               <th key={idx} colSpan={y.colSpan} className="px-0.5 py-1 border-r border-slate-700 font-bold">
                 {y.year}
@@ -302,10 +302,10 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           </tr>
 
           <tr className="bg-slate-700 text-white font-medium text-center border-b border-slate-600">
-            <th style={col1Style} className="px-2 py-1.5 bg-slate-700 z-20 border-r border-slate-600 text-left">
+            <th style={col1Style} className="px-2 py-1.5 bg-slate-700 z-40 border-r border-slate-600 text-left">
               Month
             </th>
-            <th style={col2Style} className="px-2 py-1.5 bg-slate-700 z-20 border-r border-slate-600 text-left" />
+            <th style={col2Style} className="px-2 py-1.5 bg-slate-700 z-40 border-r border-slate-600 text-left" />
             {monthSpans.map((m, idx) => (
               <th key={idx} colSpan={m.colSpan} className="px-0.5 py-1 border-r border-slate-600 text-[11px] font-semibold">
                 {m.monthName}
@@ -314,10 +314,10 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           </tr>
 
           <tr className="bg-slate-600 text-slate-100 font-medium text-center border-b border-slate-500">
-            <th style={col1Style} className="px-2 py-1 bg-slate-600 z-20 border-r border-slate-500 text-left">
+            <th style={col1Style} className="px-2 py-1 bg-slate-600 z-40 border-r border-slate-500 text-left">
               Week
             </th>
-            <th style={col2Style} className="px-2 py-1 bg-slate-600 z-20 border-r border-slate-500 text-left" />
+            <th style={col2Style} className="px-2 py-1 bg-slate-600 z-40 border-r border-slate-500 text-left" />
             {weekSpans.map((w, idx) => (
               <th key={idx} colSpan={w.colSpan} className="px-0.5 py-1 border-r border-slate-500 text-[10px]">
                 W{w.weekNumber}
@@ -326,26 +326,26 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           </tr>
 
           <tr className="bg-slate-100 text-slate-700 font-bold text-center border-b border-slate-300">
-            <th style={col1Style} className="px-2 py-1.5 bg-slate-200 z-20 border-r border-slate-300 text-left relative group">
+            <th style={col1Style} className="px-2 py-2 bg-slate-200 z-40 border-r border-slate-300 text-left relative group">
               <div className="flex items-center justify-between">
                 <span className="truncate">Lab & Comments</span>
                 <span className="text-[10px] text-slate-400 font-normal shrink-0">↔</span>
               </div>
               <div
                 onMouseDown={handleStartResizeCol1}
-                className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize hover:bg-blue-600/70 bg-transparent z-30"
+                className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize hover:bg-blue-600/70 bg-transparent z-50"
                 title="Drag to resize Lab column width"
               />
             </th>
 
-            <th style={col2Style} className="px-2 py-1.5 bg-slate-200 z-20 border-r border-slate-300 text-left relative group">
+            <th style={col2Style} className="px-2 py-2 bg-slate-200 z-40 border-r border-slate-300 text-left relative group">
               <div className="flex items-center justify-between">
                 <span className="truncate">Station & Capabilities</span>
                 <span className="text-[10px] text-slate-400 font-normal shrink-0">↔</span>
               </div>
               <div
                 onMouseDown={handleStartResizeCol2}
-                className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize hover:bg-blue-600/70 bg-transparent z-30"
+                className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize hover:bg-blue-600/70 bg-transparent z-50"
                 title="Drag to resize Station column width"
               />
             </th>
@@ -397,7 +397,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                         })
                       }
                       style={col1Style}
-                      className="px-2 py-2 bg-slate-100 z-10 border-r border-slate-300 font-semibold text-slate-800 align-top shadow-xs cursor-pointer hover:bg-slate-200 transition-colors overflow-hidden"
+                      className="px-2 py-2 bg-slate-100 z-30 border-r border-slate-300 font-semibold text-slate-800 align-top shadow-xs cursor-pointer hover:bg-slate-200 transition-colors overflow-hidden"
                       title="Click to view lab comments"
                     >
                       <div className="flex items-center justify-between">
@@ -426,7 +426,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                       })
                     }
                     style={col2Style}
-                    className="px-2 py-2 bg-white z-10 border-r border-slate-300 align-top shadow-xs cursor-pointer hover:bg-slate-50 transition-colors overflow-hidden"
+                    className="px-2 py-2 bg-white z-30 border-r border-slate-300 align-top shadow-xs cursor-pointer hover:bg-slate-50 transition-colors overflow-hidden"
                     title="Click to view station comments & capabilities"
                   >
                     <div className="flex items-center justify-between">

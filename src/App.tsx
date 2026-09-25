@@ -579,6 +579,10 @@ export function App() {
             tests={tests}
             calendarDays={calendarDays}
             testTypes={testTypes}
+            startDateStr={startDateStr}
+            daysCount={daysCount}
+            onStartDateChange={setStartDateStr}
+            onDaysCountChange={setDaysCount}
           />
         )}
       </main>
