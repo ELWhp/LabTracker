@@ -12,6 +12,7 @@ import {
   createInitialMockData,
   generateCalendarDays,
   evaluateResourceAllocations,
+  evaluateLocationMismatches,
   addWorkingDays,
   calculateWorkingDaysBetween,
 } from './utils/labTrackerUtils';
@@ -138,6 +139,7 @@ export function App() {
 
   const calendarDays = generateCalendarDays(startDateStr, daysCount);
   const resourceIssues = evaluateResourceAllocations(tests, resources, calendarDays, testTypes);
+  const locationIssues = evaluateLocationMismatches(tests, labs, stations, resources);
 
   let selectedAllocation: UnitAllocation | null = null;
   let selectedTest: LabTest | null = null;
@@ -489,7 +491,7 @@ export function App() {
       {/* Main Content Area filling ~98% PC Screen Width */}
       <main className="flex-1 max-w-[98%] w-full mx-auto p-3 space-y-3">
         {/* Sleek Vertically Compact Resource Allocation Banner */}
-        <ResourceAlertBanner issues={resourceIssues} />
+        <ResourceAlertBanner issues={resourceIssues} locationIssues={locationIssues} />
 
         {activeTab === 'labs' ? (
           <>

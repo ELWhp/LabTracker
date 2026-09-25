@@ -5,6 +5,7 @@ import type {
   LabTest,
   CalendarDay,
   ResourceIssue,
+  LocationMismatchIssue,
   TestTypeConfig,
   Landmark,
 } from '../types/labTracker';
@@ -108,35 +109,39 @@ export function createInitialMockData() {
   const labs: Lab[] = [
     {
       id: 'lab-1',
-      name: 'Washer Energy Lab A',
+      name: 'Washer Energy Lab A (Mty)',
       type: 'washer_energy',
       stationCount: 3,
       comments: 'Main washer energy testing facility with high pressure water lines.',
       supportedTestTypes: ['washer_energy', 'washer_performance'],
+      location: 'Mty',
     },
     {
       id: 'lab-2',
-      name: 'Dryer Energy Lab B',
+      name: 'Dryer Energy Lab B (Mty)',
       type: 'dryer_energy',
       stationCount: 2,
       comments: 'High heat venting chamber for energy compliance testing.',
       supportedTestTypes: ['dryer_energy', 'dryer_performance'],
+      location: 'Mty',
     },
     {
       id: 'lab-3',
-      name: 'Washer Performance Lab C',
+      name: 'Washer Performance Lab C (SJTC)',
       type: 'washer_performance',
       stationCount: 2,
       comments: 'Stain removal and load balance testing lab.',
       supportedTestTypes: ['washer_performance'],
+      location: 'SJTC',
     },
     {
       id: 'lab-4',
-      name: 'Dryer Performance Lab D',
+      name: 'Dryer Performance Lab D (SJTC)',
       type: 'dryer_performance',
       stationCount: 2,
       comments: 'Moisture sensing and lint accumulation facility.',
       supportedTestTypes: ['dryer_performance'],
+      location: 'SJTC',
     },
   ];
 
@@ -240,18 +245,21 @@ export function createInitialMockData() {
       name: 'Alice Johnson',
       capabilities: ['washer_energy', 'dryer_energy'],
       holidays: ['2026-09-25'],
+      location: 'Mty',
     },
     {
       id: 'res-2',
       name: 'Bob Smith',
       capabilities: ['washer_energy', 'washer_performance'],
       holidays: [],
+      location: 'Mty',
     },
     {
       id: 'res-3',
       name: 'Charlie Davis',
       capabilities: ['dryer_energy', 'dryer_performance'],
       holidays: ['2026-09-28', '2026-09-29'],
+      location: 'SJTC',
     },
   ];
 
@@ -268,6 +276,7 @@ export function createInitialMockData() {
       resourcesNeededTotal: 1,
       labType: 'washer_energy',
       startDate: baseDate,
+      assignedTechName: 'Alice Johnson',
       testOwner: 'alice@labcompany.com',
       vrNumber: 'VR-2026-001',
       linkToVR: 'https://codebeamer.example.com/item/1001',
@@ -317,6 +326,7 @@ export function createInitialMockData() {
       resourcesNeededTotal: 2,
       labType: 'dryer_energy',
       startDate: addDays(baseDate, 2),
+      assignedTechName: 'Bob Smith',
       testOwner: 'charlie@labcompany.com',
       vrNumber: 'VR-2026-008',
       linkToVR: 'https://codebeamer.example.com/item/1008',
@@ -434,6 +444,49 @@ export function evaluateResourceAllocations(
         endDate: currentConflictEnd,
         demand: maxDemand,
         capacity: maxCapacity,
+      });
+    }
+  });
+
+  return issues;
+}
+
+export function evaluateLocationMismatches(
+  tests: LabTest[],
+  labs: Lab[],
+  stations: Station[],
+  resources: PersonnelResource[]
+): LocationMismatchIssue[] {
+  const issues: LocationMismatchIssue[] = [];
+
+  tests.forEach((test) => {
+    if (test.status === 'completed' || !test.assignedTechName) return;
+
+    const assignedTech = resources.find(
+      (r) => r.name.toLowerCase() === test.assignedTechName?.toLowerCase()
+    );
+
+    if (!assignedTech || !assignedTech.location) return;
+
+    // Find assigned station and lab
+    const firstAlloc = test.unitAllocations[0];
+    if (!firstAlloc) return;
+
+    const station = stations.find((s) => s.id === firstAlloc.stationId);
+    const lab = station ? labs.find((l) => l.id === station.labId) : null;
+
+    if (!lab || !lab.location) return;
+
+    if (assignedTech.location.toLowerCase() !== lab.location.toLowerCase()) {
+      issues.push({
+        testId: test.id,
+        testName: test.name,
+        techName: assignedTech.name,
+        labName: lab.name,
+        labLocation: lab.location,
+        techLocation: assignedTech.location,
+        startDate: test.startDate,
+        endDate: firstAlloc.endDate,
       });
     }
   });

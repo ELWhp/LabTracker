@@ -44,6 +44,7 @@ export interface Lab {
   stationCount: number;
   comments?: string;
   supportedTestTypes?: string[];
+  location?: string;
 }
 
 export interface PersonnelResource {
@@ -51,6 +52,7 @@ export interface PersonnelResource {
   name: string;
   capabilities: LabType[];
   holidays: string[];
+  location?: string;
 }
 
 export interface UnitAllocation {
@@ -106,6 +108,17 @@ export interface ResourceIssue {
   endDate: string;
   demand: number;
   capacity: number;
+}
+
+export interface LocationMismatchIssue {
+  testId: string;
+  testName: string;
+  techName: string;
+  labName: string;
+  labLocation: string;
+  techLocation: string;
+  startDate: string;
+  endDate: string;
 }
 
 export interface Landmark {

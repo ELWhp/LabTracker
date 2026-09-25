@@ -54,10 +54,20 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
         }
       }
 
-      // Auto-assign qualified technician based on labType
-      const qualifiedTech = resources.find((r) => r.capabilities.includes(labType));
-      if (qualifiedTech) {
-        setAssignedTechName(qualifiedTech.name);
+      // Auto-assign qualified technician based on labType AND matching lab location
+      const selectedLab = labs.find((l) => l.type === labType || (l.supportedTestTypes && l.supportedTestTypes.includes(labType)));
+      const labLocation = selectedLab?.location?.toLowerCase() || '';
+
+      const locationMatchTech = resources.find(
+        (r) => r.capabilities.includes(labType) && r.location?.toLowerCase() === labLocation
+      );
+
+      const anyQualifiedTech = resources.find((r) => r.capabilities.includes(labType));
+
+      if (locationMatchTech) {
+        setAssignedTechName(locationMatchTech.name);
+      } else if (anyQualifiedTech) {
+        setAssignedTechName(anyQualifiedTech.name);
       } else if (resources.length > 0) {
         setAssignedTechName(resources[0].name);
       }

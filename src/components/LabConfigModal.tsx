@@ -51,7 +51,13 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
   // New item inputs
   const [newLabName, setNewLabName] = useState('');
   const [newLabType, setNewLabType] = useState('washer_energy');
+  const [newLabLocation, setNewLabLocation] = useState('Mty');
   const [newLabComments, setNewLabComments] = useState('');
+
+  const [newTechLocation, setNewTechLocation] = useState('Mty');
+
+  const [selectedLabForStation, setSelectedLabForStation] = useState<string>(labs[0]?.id || '');
+  const [newStationNameInput, setNewStationNameInput] = useState('');
 
   const [newTestTypeName, setNewTestTypeName] = useState('');
   const [newTestTypeLabel, setNewTestTypeLabel] = useState('');
@@ -98,6 +104,7 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
       stationCount: 2,
       comments: newLabComments.trim() || undefined,
       supportedTestTypes: [newLabType],
+      location: newLabLocation,
     };
 
     const newLabStations: Station[] = [
@@ -126,10 +133,41 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
     setNewLabComments('');
   };
 
+  const handleAddStationToLab = (labId: string, customName?: string) => {
+    const targetLab = localLabs.find((l) => l.id === labId);
+    if (!targetLab) return;
+
+    const existingLabStations = localStations.filter((s) => s.labId === labId);
+    const existingNumbers = existingLabStations.map((s) => s.stationNumber);
+    const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
+
+    const newStation: Station = {
+      id: `st-${labId}-${Date.now()}`,
+      labId,
+      stationNumber: nextNumber,
+      name: customName?.trim() || `${targetLab.name} - Station ${nextNumber}`,
+      comments: 'Newly added station',
+      capabilities: [],
+    };
+
+    setLocalStations([...localStations, newStation]);
+    setLocalLabs(
+      localLabs.map((l) =>
+        l.id === labId ? { ...l, stationCount: (l.stationCount || existingLabStations.length) + 1 } : l
+      )
+    );
+  };
+
   const handleDeleteLab = (labId: string) => {
     if (confirm('Delete this lab and all its stations?')) {
       setLocalLabs(localLabs.filter((l) => l.id !== labId));
       setLocalStations(localStations.filter((s) => s.labId !== labId));
+    }
+  };
+
+  const handleDeleteStation = (stationId: string) => {
+    if (confirm('Delete this station?')) {
+      setLocalStations(localStations.filter((s) => s.id !== stationId));
     }
   };
 
@@ -158,6 +196,7 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
       name: newTechName.trim(),
       capabilities: [localTestTypes[0]?.id || 'washer_energy'],
       holidays: [],
+      location: newTechLocation,
     };
     setLocalResources([...localResources, newTech]);
     setNewTechName('');
@@ -181,8 +220,8 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
         <div className="flex border-b border-slate-200 gap-2">
           {[
             { key: 'labs', label: 'Labs & Types', icon: FileText },
+            { key: 'stations', label: 'Stations & Capabilities', icon: Cpu },
             { key: 'testTypes', label: 'Test Types', icon: Settings },
-            { key: 'stations', label: 'Stations', icon: Cpu },
             { key: 'techs', label: 'Technicians', icon: Users },
             { key: 'landmarks', label: 'Landmarks', icon: Flag },
           ].map(({ key, label, icon: Icon }) => (
@@ -207,7 +246,7 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
             <div className="space-y-4">
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
                 <h3 className="font-bold text-slate-800">Add New Lab</h3>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   <input
                     type="text"
                     placeholder="Lab Name (e.g. Washer Energy Lab E)"
@@ -228,6 +267,13 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
                   </select>
                   <input
                     type="text"
+                    placeholder="Location (e.g. Mty, SJTC)"
+                    value={newLabLocation}
+                    onChange={(e) => setNewLabLocation(e.target.value)}
+                    className="px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
+                  />
+                  <input
+                    type="text"
                     placeholder="Lab Comments"
                     value={newLabComments}
                     onChange={(e) => setNewLabComments(e.target.value)}
@@ -243,72 +289,292 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
               </div>
 
               <div className="space-y-3">
-                {localLabs.map((lab) => (
-                  <div key={lab.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
-                    <div className="flex items-center justify-between border-b pb-1.5">
-                      <div className="font-bold text-slate-800 text-sm">{lab.name}</div>
-                      <button
-                        onClick={() => handleDeleteLab(lab.id)}
-                        className="text-red-500 hover:text-red-700 p-1"
-                        title="Delete Lab"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                {localLabs.map((lab) => {
+                  const labStations = localStations.filter((s) => s.labId === lab.id);
+                  return (
+                    <div key={lab.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2.5 shadow-2xs">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <div className="flex items-center gap-2 flex-1 mr-2">
+                          <label className="text-[10px] font-bold text-slate-500">Edit Lab Name:</label>
+                          <input
+                            type="text"
+                            value={lab.name}
+                            onChange={(e) => {
+                              const updated = localLabs.map((l) =>
+                                l.id === lab.id ? { ...l, name: e.target.value } : l
+                              );
+                              setLocalLabs(updated);
+                            }}
+                            className="px-2.5 py-1 border border-slate-300 rounded text-xs font-bold text-slate-900 bg-slate-50 focus:bg-white flex-1"
+                          />
+                        </div>
 
-                    <div>
-                      <label className="font-semibold text-slate-600 block mb-1">Lab Comments:</label>
-                      <input
-                        type="text"
-                        value={lab.comments || ''}
-                        onChange={(e) => {
-                          const updated = localLabs.map((l) =>
-                            l.id === lab.id ? { ...l, comments: e.target.value } : l
-                          );
-                          setLocalLabs(updated);
-                        }}
-                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
-                      />
-                    </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleAddStationToLab(lab.id)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-xs flex items-center gap-1 cursor-pointer"
+                            title="Add a new station to this lab"
+                          >
+                            <Plus className="h-3.5 w-3.5" /> Add Station ({labStations.length})
+                          </button>
 
-                    <div>
-                      <label className="font-semibold text-slate-600 block mb-1">Supported Test Types:</label>
-                      <div className="flex flex-wrap gap-2">
-                        {localTestTypes.map((tt) => {
-                          const isSupported = (lab.supportedTestTypes || [lab.type]).includes(tt.id);
-                          return (
-                            <label
-                              key={tt.id}
-                              className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isSupported}
-                                onChange={() => {
-                                  const current = lab.supportedTestTypes || [lab.type];
-                                  const updatedTypes = isSupported
-                                    ? current.filter((t) => t !== tt.id)
-                                    : [...current, tt.id];
-                                  setLocalLabs(
-                                    localLabs.map((l) =>
-                                      l.id === lab.id ? { ...l, supportedTestTypes: updatedTypes } : l
-                                    )
-                                  );
-                                }}
-                              />
-                              <span className="font-medium text-slate-700">{tt.label}</span>
-                            </label>
-                          );
-                        })}
+                          <button
+                            onClick={() => handleDeleteLab(lab.id)}
+                            className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
+                            title="Delete Lab"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="font-semibold text-slate-600 block mb-1">Lab Facility Location:</label>
+                          <input
+                            type="text"
+                            value={lab.location || 'Mty'}
+                            placeholder="e.g. Mty, SJTC"
+                            onChange={(e) => {
+                              const updated = localLabs.map((l) =>
+                                l.id === lab.id ? { ...l, location: e.target.value } : l
+                              );
+                              setLocalLabs(updated);
+                            }}
+                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs font-bold text-slate-800"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-semibold text-slate-600 block mb-1">Lab Comments:</label>
+                          <input
+                            type="text"
+                            value={lab.comments || ''}
+                            placeholder="e.g. High pressure water lines lab"
+                            onChange={(e) => {
+                              const updated = localLabs.map((l) =>
+                                l.id === lab.id ? { ...l, comments: e.target.value } : l
+                              );
+                              setLocalLabs(updated);
+                            }}
+                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-600 block mb-1">Supported Test Types:</label>
+                        <div className="flex flex-wrap gap-2">
+                          {localTestTypes.map((tt) => {
+                            const isSupported = (lab.supportedTestTypes || [lab.type]).includes(tt.id);
+                            return (
+                              <label
+                                key={tt.id}
+                                className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSupported}
+                                  onChange={() => {
+                                    const current = lab.supportedTestTypes || [lab.type];
+                                    const updatedTypes = isSupported
+                                      ? current.filter((t) => t !== tt.id)
+                                      : [...current, tt.id];
+                                    setLocalLabs(
+                                      localLabs.map((l) =>
+                                        l.id === lab.id ? { ...l, supportedTestTypes: updatedTypes } : l
+                                      )
+                                    );
+                                  }}
+                                />
+                                <span className="font-medium text-slate-700">{tt.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* TAB 5: LANDMARKS & LAUNCH DATES */}
+          {/* TAB 2: STATIONS & CAPABILITIES */}
+          {activeTab === 'stations' && (
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                <h3 className="font-bold text-slate-800">Add New Station to Lab</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  <select
+                    value={selectedLabForStation || localLabs[0]?.id || ''}
+                    onChange={(e) => setSelectedLabForStation(e.target.value)}
+                    className="px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
+                  >
+                    {localLabs.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Station Name (Optional)"
+                    value={newStationNameInput}
+                    onChange={(e) => setNewStationNameInput(e.target.value)}
+                    className="px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
+                  />
+                  <button
+                    onClick={() => {
+                      const labId = selectedLabForStation || localLabs[0]?.id;
+                      if (labId) {
+                        handleAddStationToLab(labId, newStationNameInput);
+                        setNewStationNameInput('');
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-blue-600 text-white font-bold rounded text-xs flex items-center gap-1 hover:bg-blue-500 cursor-pointer justify-center"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Station
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {localStations.map((station) => {
+                  const lab = localLabs.find((l) => l.id === station.labId);
+                  return (
+                    <div key={station.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between border-b pb-1 font-bold text-slate-800">
+                        <span>{station.name} ({lab?.name})</span>
+                        <button
+                          onClick={() => handleDeleteStation(station.id)}
+                          className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
+                          title="Delete Station"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="font-semibold text-slate-600 block mb-1">Station Number (Unique per Lab):</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={99}
+                            value={station.stationNumber}
+                            onChange={(e) => {
+                              const newNum = parseInt(e.target.value) || 1;
+                              const hasDuplicate = localStations.some(
+                                (s) => s.labId === station.labId && s.id !== station.id && s.stationNumber === newNum
+                              );
+                              if (hasDuplicate) {
+                                alert(`Station number ${newNum} is already assigned in ${lab?.name}. Station numbers must be unique within each lab!`);
+                                return;
+                              }
+                              setLocalStations(
+                                localStations.map((s) =>
+                                  s.id === station.id ? { ...s, stationNumber: newNum } : s
+                                )
+                              );
+                            }}
+                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs font-mono text-center font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-semibold text-slate-600 block mb-1">Station Name:</label>
+                          <input
+                            type="text"
+                            value={station.name}
+                            onChange={(e) => {
+                              setLocalStations(
+                                localStations.map((s) =>
+                                  s.id === station.id ? { ...s, name: e.target.value } : s
+                                )
+                              );
+                            }}
+                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-semibold text-slate-600 block mb-1">Station Comments:</label>
+                          <input
+                            type="text"
+                            value={station.comments || ''}
+                            onChange={(e) => {
+                              setLocalStations(
+                                localStations.map((s) =>
+                                  s.id === station.id ? { ...s, comments: e.target.value } : s
+                                )
+                              );
+                            }}
+                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Capabilities List */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-semibold text-slate-600">Station Capabilities & Sensors:</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newCapName = prompt('Enter capability name (e.g. Thermistor 1, Scale, Humidity Sensor):');
+                              if (!newCapName) return;
+                              const newCapComment = prompt('Enter comments for this capability:') || '';
+                              const newCap: StationCapability = {
+                                id: `cap-${Date.now()}`,
+                                name: newCapName,
+                                comments: newCapComment,
+                              };
+                              const updatedCaps = [...(station.capabilities || []), newCap];
+                              setLocalStations(
+                                localStations.map((s) =>
+                                  s.id === station.id ? { ...s, capabilities: updatedCaps } : s
+                                )
+                              );
+                            }}
+                            className="text-[10px] text-blue-600 hover:underline font-bold cursor-pointer"
+                          >
+                            + Add Capability
+                          </button>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5">
+                          {(station.capabilities || []).map((cap) => (
+                            <div key={cap.id} className="bg-emerald-50 border border-emerald-200 px-2 py-1 rounded text-[11px] flex items-center gap-2">
+                              <div>
+                                <span className="font-bold text-emerald-900">{cap.name}</span>
+                                {cap.comments && <span className="text-emerald-700 italic block text-[9px]">{cap.comments}</span>}
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const updatedCaps = (station.capabilities || []).filter((c) => c.id !== cap.id);
+                                  setLocalStations(
+                                    localStations.map((s) =>
+                                      s.id === station.id ? { ...s, capabilities: updatedCaps } : s
+                                    )
+                                  );
+                                }}
+                                className="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: LANDMARKS & LAUNCH DATES */}
           {activeTab === 'landmarks' && (
             <div className="space-y-4">
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
@@ -386,7 +652,7 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: CUSTOM TEST TYPES */}
+          {/* TAB 4: CUSTOM TEST TYPES */}
           {activeTab === 'testTypes' && (
             <div className="space-y-4">
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
@@ -430,7 +696,7 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
                     </div>
                     <button
                       onClick={() => handleDeleteTestType(tt.id)}
-                      className="text-red-500 hover:text-red-700 p-1"
+                      className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -440,151 +706,29 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: STATIONS & CAPABILITIES */}
-          {activeTab === 'stations' && (
-            <div className="space-y-3">
-              {localStations.map((station) => {
-                const lab = localLabs.find((l) => l.id === station.labId);
-                return (
-                  <div key={station.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
-                    <div className="flex items-center justify-between border-b pb-1 font-bold text-slate-800">
-                      <span>{station.name} ({lab?.name})</span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className="font-semibold text-slate-600 block mb-1">Station Number (Unique per Lab):</label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={99}
-                          value={station.stationNumber}
-                          onChange={(e) => {
-                            const newNum = parseInt(e.target.value) || 1;
-                            const hasDuplicate = localStations.some(
-                              (s) => s.labId === station.labId && s.id !== station.id && s.stationNumber === newNum
-                            );
-                            if (hasDuplicate) {
-                              alert(`Station number ${newNum} is already assigned in ${lab?.name}. Station numbers must be unique within each lab!`);
-                              return;
-                            }
-                            setLocalStations(
-                              localStations.map((s) =>
-                                s.id === station.id ? { ...s, stationNumber: newNum } : s
-                              )
-                            );
-                          }}
-                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs font-mono text-center font-bold"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="font-semibold text-slate-600 block mb-1">Station Name:</label>
-                        <input
-                          type="text"
-                          value={station.name}
-                          onChange={(e) => {
-                            setLocalStations(
-                              localStations.map((s) =>
-                                s.id === station.id ? { ...s, name: e.target.value } : s
-                              )
-                            );
-                          }}
-                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="font-semibold text-slate-600 block mb-1">Station Comments:</label>
-                        <input
-                          type="text"
-                          value={station.comments || ''}
-                          onChange={(e) => {
-                            setLocalStations(
-                              localStations.map((s) =>
-                                s.id === station.id ? { ...s, comments: e.target.value } : s
-                              )
-                            );
-                          }}
-                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Capabilities List (Thermistor 1, Scale, Humidity Sensor) */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="font-semibold text-slate-600">Station Capabilities & Sensors:</label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newCapName = prompt('Enter capability name (e.g. Thermistor 1, Scale, Humidity Sensor):');
-                            if (!newCapName) return;
-                            const newCapComment = prompt('Enter comments for this capability:') || '';
-                            const newCap: StationCapability = {
-                              id: `cap-${Date.now()}`,
-                              name: newCapName,
-                              comments: newCapComment,
-                            };
-                            const updatedCaps = [...(station.capabilities || []), newCap];
-                            setLocalStations(
-                              localStations.map((s) =>
-                                s.id === station.id ? { ...s, capabilities: updatedCaps } : s
-                              )
-                            );
-                          }}
-                          className="text-[10px] text-blue-600 hover:underline font-bold"
-                        >
-                          + Add Capability
-                        </button>
-                      </div>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        {(station.capabilities || []).map((cap) => (
-                          <div key={cap.id} className="bg-emerald-50 border border-emerald-200 px-2 py-1 rounded text-[11px] flex items-center gap-2">
-                            <div>
-                              <span className="font-bold text-emerald-900">{cap.name}</span>
-                              {cap.comments && <span className="text-emerald-700 italic block text-[9px]">{cap.comments}</span>}
-                            </div>
-                            <button
-                              onClick={() => {
-                                const updatedCaps = (station.capabilities || []).filter((c) => c.id !== cap.id);
-                                setLocalStations(
-                                  localStations.map((s) =>
-                                    s.id === station.id ? { ...s, capabilities: updatedCaps } : s
-                                  )
-                                );
-                              }}
-                              className="text-red-500 hover:text-red-700 font-bold text-xs"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* TAB 4: TECHNICIANS */}
+          {/* TAB 5: TECHNICIANS */}
           {activeTab === 'techs' && (
             <div className="space-y-4">
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
                 <h3 className="font-bold text-slate-800">Add New Technician</h3>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <input
                     type="text"
                     placeholder="Technician Name (e.g. Jane Doe)"
                     value={newTechName}
                     onChange={(e) => setNewTechName(e.target.value)}
-                    className="flex-1 px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
+                    className="px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Location (e.g. Mty, SJTC)"
+                    value={newTechLocation}
+                    onChange={(e) => setNewTechLocation(e.target.value)}
+                    className="px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
                   />
                   <button
                     onClick={handleAddTech}
-                    className="px-3 py-1.5 bg-blue-600 text-white font-bold rounded text-xs flex items-center gap-1 hover:bg-blue-500 cursor-pointer"
+                    className="px-3 py-1.5 bg-blue-600 text-white font-bold rounded text-xs flex items-center gap-1 hover:bg-blue-500 cursor-pointer justify-center"
                   >
                     <Plus className="h-3.5 w-3.5" /> Add Tech
                   </button>
@@ -595,10 +739,27 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
                 {localResources.map((tech) => (
                   <div key={tech.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
                     <div className="flex items-center justify-between border-b pb-1 font-bold text-slate-800">
-                      <span>{tech.name}</span>
+                      <div className="flex items-center gap-3 flex-1 mr-2">
+                        <span>{tech.name}</span>
+                        <div className="flex items-center gap-1">
+                          <label className="text-[10px] text-slate-500 font-normal">Location:</label>
+                          <input
+                            type="text"
+                            value={tech.location || 'Mty'}
+                            placeholder="Mty or SJTC"
+                            onChange={(e) => {
+                              const updated = localResources.map((r) =>
+                                r.id === tech.id ? { ...r, location: e.target.value } : r
+                              );
+                              setLocalResources(updated);
+                            }}
+                            className="px-2 py-0.5 border border-slate-300 rounded text-xs font-bold text-slate-800 w-24"
+                          />
+                        </div>
+                      </div>
                       <button
                         onClick={() => setLocalResources(localResources.filter((r) => r.id !== tech.id))}
-                        className="text-red-500 hover:text-red-700 p-1"
+                        className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
