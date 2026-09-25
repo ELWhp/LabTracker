@@ -17,6 +17,7 @@ interface ScheduleGridProps {
   tests: LabTest[];
   landmarks?: Landmark[];
   calendarDays: CalendarDay[];
+  viewMode?: 'days' | 'weeks';
   selectedAllocationId: string | null;
   onSelectAllocation: (allocation: UnitAllocation, test: LabTest) => void;
   onUpdateAllocationDates: (
@@ -38,6 +39,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
   tests,
   landmarks = [],
   calendarDays,
+  viewMode = 'days',
   selectedAllocationId,
   onSelectAllocation,
   onUpdateAllocationDates,
@@ -47,8 +49,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
   const testMap = new Map<string, LabTest>(tests.map((t) => [t.id, t]));
 
   // Resizable column width states (defaults in pixels)
-  const [labColWidth, setLabColWidth] = useState<number>(200);
-  const [stationColWidth, setStationColWidth] = useState<number>(180);
+  const [labColWidth, setLabColWidth] = useState<number>(180);
+  const [stationColWidth, setStationColWidth] = useState<number>(160);
 
   const [isResizingCol1, setIsResizingCol1] = useState(false);
   const [isResizingCol2, setIsResizingCol2] = useState(false);
@@ -72,10 +74,10 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       const deltaX = e.clientX - startXRef.current;
       if (isResizingCol1) {
-        const newWidth = Math.max(120, Math.min(600, startWidthRef.current + deltaX));
+        const newWidth = Math.max(100, Math.min(500, startWidthRef.current + deltaX));
         setLabColWidth(newWidth);
       } else if (isResizingCol2) {
-        const newWidth = Math.max(120, Math.min(600, startWidthRef.current + deltaX));
+        const newWidth = Math.max(100, Math.min(500, startWidthRef.current + deltaX));
         setStationColWidth(newWidth);
       }
     };
@@ -224,6 +226,9 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     boxSizing: 'border-box',
   };
 
+  // Compact day column width (22px so significantly more days fit on screen)
+  const cellWidth = viewMode === 'weeks' ? '44px' : '22px';
+
   return (
     <div ref={containerRef} className="relative overflow-x-auto border border-gray-300 rounded-lg shadow-sm bg-white min-h-[500px]">
       {/* Floating Comment Popup Modal */}
@@ -279,7 +284,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           <col style={{ width: `${labColWidth}px` }} />
           <col style={{ width: `${stationColWidth}px` }} />
           {calendarDays.map((d) => (
-            <col key={d.dateStr} style={{ width: '30px' }} />
+            <col key={d.dateStr} style={{ width: cellWidth }} />
           ))}
         </colgroup>
 
@@ -290,7 +295,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             </th>
             <th style={col2Style} className="px-2 py-2 bg-slate-800 z-20 border-r border-slate-700 text-left" />
             {yearSpans.map((y, idx) => (
-              <th key={idx} colSpan={y.colSpan} className="px-1 py-1 border-r border-slate-700">
+              <th key={idx} colSpan={y.colSpan} className="px-0.5 py-1 border-r border-slate-700 font-bold">
                 {y.year}
               </th>
             ))}
@@ -302,7 +307,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             </th>
             <th style={col2Style} className="px-2 py-1.5 bg-slate-700 z-20 border-r border-slate-600 text-left" />
             {monthSpans.map((m, idx) => (
-              <th key={idx} colSpan={m.colSpan} className="px-1 py-1 border-r border-slate-600">
+              <th key={idx} colSpan={m.colSpan} className="px-0.5 py-1 border-r border-slate-600 text-[11px] font-semibold">
                 {m.monthName}
               </th>
             ))}
@@ -321,12 +326,11 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           </tr>
 
           <tr className="bg-slate-100 text-slate-700 font-bold text-center border-b border-slate-300">
-            <th style={col1Style} className="px-2 py-2 bg-slate-200 z-20 border-r border-slate-300 text-left relative group">
+            <th style={col1Style} className="px-2 py-1.5 bg-slate-200 z-20 border-r border-slate-300 text-left relative group">
               <div className="flex items-center justify-between">
                 <span className="truncate">Lab & Comments</span>
                 <span className="text-[10px] text-slate-400 font-normal shrink-0">↔</span>
               </div>
-              {/* Resizer handle for Column 1 */}
               <div
                 onMouseDown={handleStartResizeCol1}
                 className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize hover:bg-blue-600/70 bg-transparent z-30"
@@ -334,12 +338,11 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
               />
             </th>
 
-            <th style={col2Style} className="px-2 py-2 bg-slate-200 z-20 border-r border-slate-300 text-left relative group">
+            <th style={col2Style} className="px-2 py-1.5 bg-slate-200 z-20 border-r border-slate-300 text-left relative group">
               <div className="flex items-center justify-between">
                 <span className="truncate">Station & Capabilities</span>
                 <span className="text-[10px] text-slate-400 font-normal shrink-0">↔</span>
               </div>
-              {/* Resizer handle for Column 2 */}
               <div
                 onMouseDown={handleStartResizeCol2}
                 className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize hover:bg-blue-600/70 bg-transparent z-30"
@@ -352,7 +355,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
               return (
                 <th
                   key={day.dateStr}
-                  className={`px-0.5 py-1 border-r border-slate-200 relative text-center ${
+                  className={`px-0 py-1 border-r border-slate-200 relative text-center text-[10px] ${
                     day.isWeekend ? 'bg-slate-200 text-slate-400' : 'bg-slate-50'
                   }`}
                   title={`${day.dateStr} (${day.monthName} ${day.dayOfMonth})${
@@ -361,7 +364,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                 >
                   {landmarkOnDay && (
                     <div
-                      className="absolute -top-7 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap z-30"
+                      className="absolute -top-7 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] font-bold px-1 py-0.5 rounded shadow-md whitespace-nowrap z-30"
                       title={`Landmark Date: ${landmarkOnDay.name} (${landmarkOnDay.date})`}
                     >
                       {landmarkOnDay.name}
@@ -399,13 +402,13 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-slate-900 truncate">{lab.name}</span>
-                        <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 ml-1" />
+                        <Info className="h-3 w-3 text-blue-500 shrink-0 ml-0.5" />
                       </div>
-                      <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded font-mono">
+                      <span className="inline-block mt-0.5 text-[9px] px-1 py-0.2 bg-blue-100 text-blue-800 rounded font-mono">
                         {LAB_TYPE_LABELS[lab.type] || lab.type}
                       </span>
                       {lab.comments && (
-                        <div className="text-[10px] text-slate-500 italic mt-1 line-clamp-2">
+                        <div className="text-[9px] text-slate-500 italic mt-1 line-clamp-2">
                           "{lab.comments}"
                         </div>
                       )}
@@ -428,13 +431,13 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-slate-800 truncate">{station.name}</span>
-                      <Cpu className="h-3.5 w-3.5 text-emerald-500 shrink-0 ml-1" />
+                      <Cpu className="h-3 w-3 text-emerald-500 shrink-0 ml-0.5" />
                     </div>
 
                     {station.capabilities && station.capabilities.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
+                      <div className="flex flex-wrap gap-0.5 mt-0.5">
                         {station.capabilities.map((cap) => (
-                          <span key={cap.id} className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-mono">
+                          <span key={cap.id} className="text-[8px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-mono">
                             {cap.name}
                           </span>
                         ))}
@@ -442,7 +445,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                     )}
 
                     {station.comments && (
-                      <div className="text-[10px] text-slate-500 italic mt-1 line-clamp-1">
+                      <div className="text-[9px] text-slate-500 italic mt-0.5 line-clamp-1">
                         {station.comments}
                       </div>
                     )}
@@ -480,7 +483,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                           colSpan={colSpan}
                           onDragOver={handleDragOver}
                           onDrop={(e) => handleDrop(e, station.id, day.dateStr)}
-                          className="p-1 border-r border-slate-200 align-middle relative h-12"
+                          className="p-0.5 border-r border-slate-200 align-middle relative h-10"
                         >
                           {/* Vertical Landmark Launch Line */}
                           {landmarkOnDay && (
@@ -495,12 +498,12 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                             onDragStart={(e) => handleDragStart(e, alloc)}
                             onClick={() => onSelectAllocation(alloc, test)}
                             style={{ backgroundColor: test.status === 'completed' ? '#94a3b8' : test.color || '#2563eb' }}
-                            className={`h-full w-full rounded-md px-1.5 text-white font-medium flex items-center justify-between cursor-grab active:cursor-grabbing shadow-sm transition-all hover:brightness-110 relative group ${
+                            className={`h-full w-full rounded px-1 text-white font-medium flex items-center justify-between cursor-grab active:cursor-grabbing shadow-2xs transition-all hover:brightness-110 relative group ${
                               test.status === 'completed' ? 'opacity-80' : ''
                             } ${
                               isSelected ? 'ring-2 ring-black ring-offset-1 z-10' : ''
                             }`}
-                            title={`Test: ${test.name} ${test.status === 'completed' ? '(Completed)' : ''}\nVR: ${test.vrNumber || 'N/A'}\nOwner: ${test.testOwner || 'N/A'}\nUnit: ${alloc.unitIndex}/${alloc.totalUnits}\nDates: ${alloc.startDate} to ${alloc.endDate}\nDrag handles on left/right to extend or shrink test duration!`}
+                            title={`Test: ${test.name} ${test.status === 'completed' ? '(Completed)' : ''}\nVR: ${test.vrNumber || 'N/A'}\nOwner: ${test.testOwner || 'N/A'}\nUnit: ${alloc.unitIndex}/${alloc.totalUnits}\nDates: ${alloc.startDate} to ${alloc.endDate}`}
                           >
                             {/* Left Resize Handle */}
                             {onResizeAllocation && (
@@ -517,12 +520,12 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                               </button>
                             )}
 
-                            <span className="truncate mr-1 text-[11px] font-semibold drop-shadow-sm pl-1">
+                            <span className="truncate mr-1 text-[10px] font-semibold drop-shadow-2xs pl-0.5">
                               {test.name}
                             </span>
 
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="bg-black/30 text-white font-mono text-[9px] px-1 py-0.5 rounded">
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <span className="bg-black/30 text-white font-mono text-[8px] px-1 py-0.2 rounded">
                                 {alloc.unitIndex}/{alloc.totalUnits}
                               </span>
                             </div>

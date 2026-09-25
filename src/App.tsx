@@ -102,6 +102,7 @@ export function App() {
   });
 
   const [daysCount, setDaysCount] = useState<number>(30);
+  const [viewMode, setViewMode] = useState<'days' | 'weeks'>('days');
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [prefilledStationId, setPrefilledStationId] = useState<string | undefined>(undefined);
@@ -507,7 +508,7 @@ export function App() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="font-semibold text-slate-700">Days to View (Max 1 Year):</label>
+                  <label className="font-semibold text-slate-700">Range to View:</label>
                   <select
                     value={daysCount}
                     onChange={(e) => setDaysCount(Math.min(365, parseInt(e.target.value) || 30))}
@@ -520,6 +521,25 @@ export function App() {
                     <option value={180}>180 Days (6 Months)</option>
                     <option value={365}>365 Days (1 Year Max)</option>
                   </select>
+                </div>
+
+                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded border border-slate-200">
+                  <button
+                    onClick={() => setViewMode('days')}
+                    className={`px-2.5 py-1 rounded font-bold text-[11px] transition-colors cursor-pointer ${
+                      viewMode === 'days' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Days View
+                  </button>
+                  <button
+                    onClick={() => setViewMode('weeks')}
+                    className={`px-2.5 py-1 rounded font-bold text-[11px] transition-colors cursor-pointer ${
+                      viewMode === 'weeks' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Weeks View
+                  </button>
                 </div>
               </div>
 
@@ -536,6 +556,7 @@ export function App() {
               tests={tests}
               landmarks={landmarks}
               calendarDays={calendarDays}
+              viewMode={viewMode}
               selectedAllocationId={selectedAllocationId}
               onSelectAllocation={(alloc) => setSelectedAllocationId(alloc.id)}
               onUpdateAllocationDates={handleUpdateAllocationDates}

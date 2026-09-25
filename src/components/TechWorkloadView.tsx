@@ -18,8 +18,36 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
 }) => {
   const typeMap = new Map<string, string>(testTypes.map((tt) => [tt.id, tt.label]));
 
-  // Exclude completed tests from technician workload
+  // Exclude completed tests from active technician workload
   const activeTests = tests.filter((t) => t.status !== 'completed');
+
+  // Compute hierarchical header spans for Techs Workload table
+  const yearSpans: { year: number; colSpan: number }[] = [];
+  const monthSpans: { monthName: string; year: number; colSpan: number }[] = [];
+  const weekSpans: { weekNumber: number; colSpan: number }[] = [];
+
+  calendarDays.forEach((day) => {
+    const lastYear = yearSpans[yearSpans.length - 1];
+    if (lastYear && lastYear.year === day.year) {
+      lastYear.colSpan++;
+    } else {
+      yearSpans.push({ year: day.year, colSpan: 1 });
+    }
+
+    const lastMonth = monthSpans[monthSpans.length - 1];
+    if (lastMonth && lastMonth.monthName === day.monthName && lastMonth.year === day.year) {
+      lastMonth.colSpan++;
+    } else {
+      monthSpans.push({ monthName: day.monthName, year: day.year, colSpan: 1 });
+    }
+
+    const lastWeek = weekSpans[weekSpans.length - 1];
+    if (lastWeek && lastWeek.weekNumber === day.weekNumber) {
+      lastWeek.colSpan++;
+    } else {
+      weekSpans.push({ weekNumber: day.weekNumber, colSpan: 1 });
+    }
+  });
 
   return (
     <div className="space-y-6">
@@ -135,23 +163,67 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
         </div>
       </div>
 
-      {/* Technician Timeline Schedule Heatmap with Parallel Active Test Lanes */}
+      {/* Technician Timeline Schedule Heatmap with Multi-Level Year/Month/Week/Day Headers */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs overflow-x-auto">
         <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-blue-600" /> Technician Active Test Lanes
+          <Calendar className="h-4 w-4 text-blue-600" /> Technician Multi-Test Timeline across Full Range ({calendarDays.length} Days)
         </h3>
 
-        <table className="min-w-full border-collapse text-xs select-none">
+        <table className="w-full border-collapse text-xs select-none" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '180px' }} />
+            {calendarDays.map((d) => (
+              <col key={d.dateStr} style={{ width: '22px' }} />
+            ))}
+          </colgroup>
+
           <thead>
-            <tr className="bg-slate-800 text-white font-semibold">
-              <th className="px-3 py-2 text-left sticky left-0 bg-slate-800 z-10 border-r border-slate-700 w-44">
+            {/* Year Header Row */}
+            <tr className="bg-slate-800 text-white font-semibold text-center border-b border-slate-700">
+              <th className="px-3 py-1.5 text-left sticky left-0 bg-slate-800 z-10 border-r border-slate-700 w-44">
+                Year
+              </th>
+              {yearSpans.map((y, idx) => (
+                <th key={idx} colSpan={y.colSpan} className="px-1 py-1 border-r border-slate-700 font-bold">
+                  {y.year}
+                </th>
+              ))}
+            </tr>
+
+            {/* Month Header Row */}
+            <tr className="bg-slate-700 text-white font-medium text-center border-b border-slate-600">
+              <th className="px-3 py-1 text-left sticky left-0 bg-slate-700 z-10 border-r border-slate-600">
+                Month
+              </th>
+              {monthSpans.map((m, idx) => (
+                <th key={idx} colSpan={m.colSpan} className="px-1 py-1 border-r border-slate-600 text-[11px] font-semibold">
+                  {m.monthName}
+                </th>
+              ))}
+            </tr>
+
+            {/* Week Header Row */}
+            <tr className="bg-slate-600 text-slate-100 font-medium text-center border-b border-slate-500">
+              <th className="px-3 py-1 text-left sticky left-0 bg-slate-600 z-10 border-r border-slate-500">
+                Week
+              </th>
+              {weekSpans.map((w, idx) => (
+                <th key={idx} colSpan={w.colSpan} className="px-0.5 py-1 border-r border-slate-500 text-[10px]">
+                  W{w.weekNumber}
+                </th>
+              ))}
+            </tr>
+
+            {/* Day Header Row */}
+            <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
+              <th className="px-3 py-2 text-left sticky left-0 bg-slate-200 z-10 border-r border-slate-300">
                 Technician & Test Lane
               </th>
-              {calendarDays.slice(0, 30).map((day) => (
+              {calendarDays.map((day) => (
                 <th
                   key={day.dateStr}
-                  className={`w-8 min-w-[32px] px-1 py-1 text-center border-r border-slate-700 ${
-                    day.isWeekend ? 'bg-slate-700 text-slate-400' : ''
+                  className={`px-0.5 py-1 text-center border-r border-slate-200 text-[10px] ${
+                    day.isWeekend ? 'bg-slate-200 text-slate-400' : 'bg-slate-50'
                   }`}
                   title={day.dateStr}
                 >
@@ -160,6 +232,7 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
               ))}
             </tr>
           </thead>
+
           <tbody>
             {resources.map((tech) => {
               const techActiveTests = activeTests.filter((t) => {
@@ -176,7 +249,7 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
                   {laneIdx === 0 && (
                     <td
                       rowSpan={lanes.length}
-                      className="px-3 py-2.5 font-bold text-slate-800 sticky left-0 bg-slate-100 z-10 border-r border-slate-300 align-top"
+                      className="px-3 py-2 font-bold text-slate-800 sticky left-0 bg-slate-100 z-10 border-r border-slate-300 align-top"
                     >
                       <div>{tech.name}</div>
                       <span className="text-[10px] text-slate-500 font-mono font-normal block">
@@ -185,7 +258,7 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
                     </td>
                   )}
 
-                  {calendarDays.slice(0, 30).map((day) => {
+                  {calendarDays.map((day) => {
                     const isOff = tech.holidays.includes(day.dateStr);
                     if (isOff) {
                       return (
