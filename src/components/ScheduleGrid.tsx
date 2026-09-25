@@ -229,15 +229,28 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
   // Compact day column width
   const cellWidth = viewMode === 'weeks' ? '44px' : '22px';
 
-  // Sort Labs hierarchically: 1. By Location alphabetically, 2. By Lab Type, 3. By Lab Name
+  const getLabTypePriority = (type: string, name: string): number => {
+    const label = (LAB_TYPE_LABELS[type] || type || name).toLowerCase();
+    if (label.includes('washer energy') || type === 'washer_energy') return 1;
+    if (label.includes('washer performance') || type === 'washer_performance') return 2;
+    if (label.includes('washer')) return 3;
+    if (label.includes('dryer energy') || type === 'dryer_energy') return 4;
+    if (label.includes('dryer performance') || type === 'dryer_performance') return 5;
+    if (label.includes('dryer')) return 6;
+    return 10;
+  };
+
+  // Sort Labs hierarchically: 1. By Location, 2. Washers First (Energy then Performance), then Dryers, 3. By Lab Name
   const sortedLabs = [...labs].sort((a, b) => {
     const locA = a.location || 'Mty';
     const locB = b.location || 'Mty';
     if (locA !== locB) {
       return locA.localeCompare(locB);
     }
-    if (a.type !== b.type) {
-      return a.type.localeCompare(b.type);
+    const prioA = getLabTypePriority(a.type, a.name);
+    const prioB = getLabTypePriority(b.type, b.name);
+    if (prioA !== prioB) {
+      return prioA - prioB;
     }
     return a.name.localeCompare(b.name);
   });
