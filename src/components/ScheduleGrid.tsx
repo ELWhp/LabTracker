@@ -49,8 +49,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
   const testMap = new Map<string, LabTest>(tests.map((t) => [t.id, t]));
 
   // Resizable column width states (defaults in pixels)
-  const [labColWidth, setLabColWidth] = useState<number>(180);
-  const [stationColWidth, setStationColWidth] = useState<number>(160);
+  const [labColWidth, setLabColWidth] = useState<number>(200);
+  const [stationColWidth, setStationColWidth] = useState<number>(180);
 
   const [isResizingCol1, setIsResizingCol1] = useState(false);
   const [isResizingCol2, setIsResizingCol2] = useState(false);
@@ -74,10 +74,10 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       const deltaX = e.clientX - startXRef.current;
       if (isResizingCol1) {
-        const newWidth = Math.max(100, Math.min(500, startWidthRef.current + deltaX));
+        const newWidth = Math.max(120, Math.min(600, startWidthRef.current + deltaX));
         setLabColWidth(newWidth);
       } else if (isResizingCol2) {
-        const newWidth = Math.max(100, Math.min(500, startWidthRef.current + deltaX));
+        const newWidth = Math.max(120, Math.min(600, startWidthRef.current + deltaX));
         setStationColWidth(newWidth);
       }
     };
@@ -226,8 +226,21 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     boxSizing: 'border-box',
   };
 
-  // Compact day column width (22px so significantly more days fit on screen)
+  // Compact day column width
   const cellWidth = viewMode === 'weeks' ? '44px' : '22px';
+
+  // Sort Labs hierarchically: 1. By Location alphabetically, 2. By Lab Type, 3. By Lab Name
+  const sortedLabs = [...labs].sort((a, b) => {
+    const locA = a.location || 'Mty';
+    const locB = b.location || 'Mty';
+    if (locA !== locB) {
+      return locA.localeCompare(locB);
+    }
+    if (a.type !== b.type) {
+      return a.type.localeCompare(b.type);
+    }
+    return a.name.localeCompare(b.name);
+  });
 
   return (
     <div ref={containerRef} className="relative overflow-x-auto border border-gray-300 rounded-lg shadow-sm bg-white min-h-[500px]">
@@ -295,7 +308,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             </th>
             <th style={col2Style} className="px-2 py-2 bg-slate-800 z-40 border-r border-slate-700 text-left" />
             {yearSpans.map((y, idx) => (
-              <th key={idx} colSpan={y.colSpan} className="px-0.5 py-1 border-r border-slate-700 font-bold">
+              <th key={idx} colSpan={y.colSpan} className="px-0.5 py-1 border-r border-slate-700 font-bold relative">
                 {y.year}
               </th>
             ))}
@@ -325,7 +338,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             ))}
           </tr>
 
-          <tr className="bg-slate-100 text-slate-700 font-bold text-center border-b border-slate-300">
+          <tr className="bg-slate-100 text-slate-700 font-bold text-center border-b-2 border-slate-400">
             <th style={col1Style} className="px-2 py-2 bg-slate-200 z-40 border-r border-slate-300 text-left relative group">
               <div className="flex items-center justify-between">
                 <span className="truncate">Lab & Comments</span>
@@ -362,13 +375,17 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                     landmarkOnDay ? ` - Landmark: ${landmarkOnDay.name}` : ''
                   }`}
                 >
+                  {/* Vertical Landmark Launch Line in Header */}
                   {landmarkOnDay && (
-                    <div
-                      className="absolute -top-7 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] font-bold px-1 py-0.5 rounded shadow-md whitespace-nowrap z-30"
-                      title={`Landmark Date: ${landmarkOnDay.name} (${landmarkOnDay.date})`}
-                    >
-                      {landmarkOnDay.name}
-                    </div>
+                    <>
+                      <div
+                        className="absolute -top-7 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none"
+                        title={`Landmark Date: ${landmarkOnDay.name} (${landmarkOnDay.date})`}
+                      >
+                        {landmarkOnDay.name}
+                      </div>
+                      <div className="absolute top-0 bottom-0 right-0 w-1 bg-red-600 z-20 pointer-events-none" />
+                    </>
                   )}
                   {day.dayOfMonth}
                 </th>
@@ -378,13 +395,24 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
         </thead>
 
         <tbody>
-          {labs.map((lab) => {
-            const labStations = stations.filter((s) => s.labId === lab.id);
+          {sortedLabs.map((lab) => {
+            // Sort stations numerically by stationNumber increasing
+            const labStations = stations
+              .filter((s) => s.labId === lab.id)
+              .sort((a, b) => a.stationNumber - b.stationNumber);
+
             if (labStations.length === 0) return null;
 
             return labStations.map((station, stationIndex) => {
+              const isLastStationInLab = stationIndex === labStations.length - 1;
+
               return (
-                <tr key={station.id} className="border-b border-slate-200 hover:bg-slate-50/80">
+                <tr
+                  key={station.id}
+                  className={`hover:bg-slate-50/80 ${
+                    isLastStationInLab ? 'border-b-2 border-slate-600' : 'border-b border-slate-200'
+                  }`}
+                >
                   {stationIndex === 0 && (
                     <td
                       rowSpan={labStations.length}
@@ -404,9 +432,16 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                         <span className="font-bold text-slate-900 truncate">{lab.name}</span>
                         <Info className="h-3 w-3 text-blue-500 shrink-0 ml-0.5" />
                       </div>
-                      <span className="inline-block mt-0.5 text-[9px] px-1 py-0.2 bg-blue-100 text-blue-800 rounded font-mono">
-                        {LAB_TYPE_LABELS[lab.type] || lab.type}
-                      </span>
+
+                      <div className="flex items-center gap-1 mt-1">
+                        <span className="inline-block text-[9px] px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded font-mono font-bold">
+                          {lab.location || 'Mty'}
+                        </span>
+                        <span className="inline-block text-[9px] px-1 py-0.2 bg-slate-200 text-slate-700 rounded font-mono">
+                          {LAB_TYPE_LABELS[lab.type] || lab.type}
+                        </span>
+                      </div>
+
                       {lab.comments && (
                         <div className="text-[9px] text-slate-500 italic mt-1 line-clamp-2">
                           "{lab.comments}"
@@ -430,7 +465,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                     title="Click to view station comments & capabilities"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-800 truncate">{station.name}</span>
+                      <span className="font-semibold text-slate-800 truncate">Station {station.stationNumber} — {station.name}</span>
                       <Cpu className="h-3 w-3 text-emerald-500 shrink-0 ml-0.5" />
                     </div>
 
@@ -485,7 +520,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                           onDrop={(e) => handleDrop(e, station.id, day.dateStr)}
                           className="p-0.5 border-r border-slate-200 align-middle relative h-10"
                         >
-                          {/* Vertical Landmark Launch Line */}
+                          {/* Vertical Landmark Launch Line (z-20: above test blocks z-10, behind sticky cols z-30) */}
                           {landmarkOnDay && (
                             <div
                               className="absolute top-0 bottom-0 right-0 w-1 bg-red-600 z-20 pointer-events-none shadow-sm"
@@ -498,7 +533,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                             onDragStart={(e) => handleDragStart(e, alloc)}
                             onClick={() => onSelectAllocation(alloc, test)}
                             style={{ backgroundColor: test.status === 'completed' ? '#94a3b8' : test.color || '#2563eb' }}
-                            className={`h-full w-full rounded px-1 text-white font-medium flex items-center justify-between cursor-grab active:cursor-grabbing shadow-2xs transition-all hover:brightness-110 relative group ${
+                            className={`h-full w-full rounded px-1 text-white font-medium flex items-center justify-between cursor-grab active:cursor-grabbing shadow-2xs transition-all hover:brightness-110 relative group z-10 ${
                               test.status === 'completed' ? 'opacity-80' : ''
                             } ${
                               isSelected ? 'ring-2 ring-black ring-offset-1 z-10' : ''
