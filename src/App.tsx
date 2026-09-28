@@ -370,7 +370,7 @@ export function App() {
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
       {/* Sleek Compact Main Navbar Header */}
-      <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+      <header className="bg-slate-900 text-white shadow-md sticky top-0 z-50">
         <div className="max-w-[98%] w-full mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center space-x-3 shrink-0">
             <div className="p-1 bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-center">
@@ -566,6 +566,10 @@ export function App() {
               onUpdateAllocationDates={handleUpdateAllocationDates}
               onResizeAllocation={handleResizeAllocation}
               onDoubleClickCell={handleDoubleClickCell}
+              onUpdateLandmark={(updatedLm) => {
+                setLandmarks(landmarks.map((lm) => (lm.id === updatedLm.id ? updatedLm : lm)));
+                setHasUnsavedChanges(true);
+              }}
             />
 
             {/* Monitoring Table with Chronogram covering ~90% screen width */}

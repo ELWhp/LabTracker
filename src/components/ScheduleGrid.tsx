@@ -31,6 +31,21 @@ interface ScheduleGridProps {
     newDateStr: string
   ) => void;
   onDoubleClickCell?: (stationId: string, dateStr: string) => void;
+  onUpdateLandmark?: (landmark: Landmark) => void;
+}
+
+interface DisplayColumn {
+  id: string;
+  dateStr: string;
+  label: string;
+  subLabel: string;
+  year: number;
+  monthName: string;
+  weekNumber: number;
+  isWeekend?: boolean;
+  startDate: string;
+  endDate: string;
+  dates: string[];
 }
 
 export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
@@ -128,30 +143,78 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Construct display columns depending on viewMode ('days' or 'weeks')
+  const displayCols: DisplayColumn[] = React.useMemo(() => {
+    if (viewMode === 'days') {
+      return calendarDays.map((d) => ({
+        id: d.dateStr,
+        dateStr: d.dateStr,
+        label: String(d.dayOfMonth),
+        subLabel: d.monthName,
+        year: d.year,
+        monthName: d.monthName,
+        weekNumber: d.weekNumber,
+        isWeekend: d.isWeekend,
+        startDate: d.dateStr,
+        endDate: d.dateStr,
+        dates: [d.dateStr],
+      }));
+    } else {
+      // Group calendarDays into weeks
+      const weekMap = new Map<string, CalendarDay[]>();
+      calendarDays.forEach((d) => {
+        const key = `${d.year}-W${d.weekNumber}`;
+        const existing = weekMap.get(key) || [];
+        existing.push(d);
+        weekMap.set(key, existing);
+      });
+
+      const cols: DisplayColumn[] = [];
+      weekMap.forEach((daysInWeek) => {
+        const first = daysInWeek[0];
+        const last = daysInWeek[daysInWeek.length - 1];
+        cols.push({
+          id: `${first.year}-W${first.weekNumber}`,
+          dateStr: first.dateStr,
+          label: `W${first.weekNumber}`,
+          subLabel: `${first.monthName} ${first.dayOfMonth}-${last.dayOfMonth}`,
+          year: first.year,
+          monthName: first.monthName,
+          weekNumber: first.weekNumber,
+          isWeekend: false,
+          startDate: first.dateStr,
+          endDate: last.dateStr,
+          dates: daysInWeek.map((d) => d.dateStr),
+        });
+      });
+      return cols;
+    }
+  }, [calendarDays, viewMode]);
+
   const yearSpans: { year: number; colSpan: number }[] = [];
   const monthSpans: { monthName: string; year: number; colSpan: number }[] = [];
   const weekSpans: { weekNumber: number; colSpan: number }[] = [];
 
-  calendarDays.forEach((day) => {
+  displayCols.forEach((col) => {
     const lastYear = yearSpans[yearSpans.length - 1];
-    if (lastYear && lastYear.year === day.year) {
+    if (lastYear && lastYear.year === col.year) {
       lastYear.colSpan++;
     } else {
-      yearSpans.push({ year: day.year, colSpan: 1 });
+      yearSpans.push({ year: col.year, colSpan: 1 });
     }
 
     const lastMonth = monthSpans[monthSpans.length - 1];
-    if (lastMonth && lastMonth.monthName === day.monthName && lastMonth.year === day.year) {
+    if (lastMonth && lastMonth.monthName === col.monthName && lastMonth.year === col.year) {
       lastMonth.colSpan++;
     } else {
-      monthSpans.push({ monthName: day.monthName, year: day.year, colSpan: 1 });
+      monthSpans.push({ monthName: col.monthName, year: col.year, colSpan: 1 });
     }
 
     const lastWeek = weekSpans[weekSpans.length - 1];
-    if (lastWeek && lastWeek.weekNumber === day.weekNumber) {
+    if (lastWeek && lastWeek.weekNumber === col.weekNumber) {
       lastWeek.colSpan++;
     } else {
-      weekSpans.push({ weekNumber: day.weekNumber, colSpan: 1 });
+      weekSpans.push({ weekNumber: col.weekNumber, colSpan: 1 });
     }
   });
 
@@ -181,11 +244,22 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     targetDateStr: string
   ) => {
     e.preventDefault();
-    const data = e.dataTransfer.getData('text/plain');
-    if (!data) return;
+    const dataStr = e.dataTransfer.getData('text/plain');
+    if (!dataStr) return;
 
     try {
-      const draggedAlloc: UnitAllocation = JSON.parse(data);
+      const parsed = JSON.parse(dataStr);
+
+      // Handle edge resizing drag drop
+      if (parsed.type === 'resize' && onResizeAllocation) {
+        onResizeAllocation(parsed.allocationId, parsed.edge, targetDateStr);
+        return;
+      }
+
+      // Handle full test allocation dragging
+      const draggedAlloc: UnitAllocation = parsed;
+      if (!draggedAlloc || !draggedAlloc.id) return;
+
       const test = testMap.get(draggedAlloc.testId);
       if (!test) return;
 
@@ -193,6 +267,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       const newEndDate = addWorkingDays(targetDateStr, unitDuration);
       const targetStationAllocations = allocationsByStation.get(targetStationId) || [];
 
+      // Exclude the dragged allocation itself from collision check!
       const hasCollision = targetStationAllocations.some(({ alloc }) => {
         if (alloc.id === draggedAlloc.id) return false;
         return targetDateStr <= alloc.endDate && newEndDate >= alloc.startDate;
@@ -205,7 +280,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 
       onUpdateAllocationDates(draggedAlloc.id, targetStationId, targetDateStr);
     } catch (err) {
-      console.error('Failed to parse drag data:', err);
+      console.error('Failed to parse drag drop data:', err);
     }
   };
 
@@ -227,8 +302,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     boxSizing: 'border-box',
   };
 
-  // Compact day column width
-  const cellWidth = viewMode === 'weeks' ? '44px' : '22px';
+  // Compact day or week column width
+  const cellWidth = viewMode === 'weeks' ? '70px' : '22px';
 
   const getLabTypePriority = (type: string, name: string): number => {
     const label = (LAB_TYPE_LABELS[type] || type || name).toLowerCase();
@@ -310,8 +385,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
         <colgroup>
           <col style={{ width: `${labColWidth}px`, minWidth: `${labColWidth}px` }} />
           <col style={{ width: `${stationColWidth}px`, minWidth: `${stationColWidth}px` }} />
-          {calendarDays.map((d) => (
-            <col key={d.dateStr} style={{ minWidth: cellWidth }} />
+          {displayCols.map((col) => (
+            <col key={col.id} style={{ minWidth: cellWidth }} />
           ))}
         </colgroup>
 
@@ -377,31 +452,68 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
               />
             </th>
 
-            {calendarDays.map((day) => {
-              const landmarkOnDay = landmarks.find((lm) => lm.date === day.dateStr);
+            {displayCols.map((col) => {
+              const landmarkOnCol = landmarks.find((lm) => col.dates.includes(lm.date));
               return (
                 <th
-                  key={day.dateStr}
-                  className={`px-0 py-1 border-r border-slate-200 relative text-center text-[10px] ${
-                    day.isWeekend ? 'bg-slate-200 text-slate-400' : 'bg-slate-50'
+                  key={col.id}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const dataStr = e.dataTransfer.getData('text/plain');
+                    if (dataStr && onUpdateLandmark) {
+                      try {
+                        const parsed = JSON.parse(dataStr);
+                        if (parsed.type === 'landmark' && parsed.landmarkId) {
+                          const targetLandmark = landmarks.find((l) => l.id === parsed.landmarkId);
+                          if (targetLandmark) {
+                            onUpdateLandmark({ ...targetLandmark, date: col.startDate });
+                          }
+                        }
+                      } catch (err) {
+                        console.error('Failed to parse landmark drag drop:', err);
+                      }
+                    }
+                  }}
+                  className={`px-0.5 py-1 border-r border-slate-200 relative text-center text-[10px] ${
+                    col.isWeekend ? 'bg-slate-200 text-slate-400' : 'bg-slate-50'
                   }`}
-                  title={`${day.dateStr} (${day.monthName} ${day.dayOfMonth})${
-                    landmarkOnDay ? ` - Landmark: ${landmarkOnDay.name}` : ''
+                  title={`${col.label} (${col.subLabel})${
+                    landmarkOnCol ? ` - Landmark: ${landmarkOnCol.name}` : ''
                   }`}
                 >
                   {/* Vertical Landmark Launch Line in Header */}
-                  {landmarkOnDay && (
+                  {landmarkOnCol && (
                     <>
                       <div
-                        className="absolute -top-7 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none"
-                        title={`Landmark Date: ${landmarkOnDay.name} (${landmarkOnDay.date})`}
+                        draggable
+                        onDragStart={(e) => {
+                          e.stopPropagation();
+                          e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'landmark', landmarkId: landmarkOnCol.id }));
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onUpdateLandmark) {
+                            const newName = prompt('Edit Landmark Name:', landmarkOnCol.name);
+                            if (newName && newName.trim()) {
+                              onUpdateLandmark({ ...landmarkOnCol, name: newName.trim() });
+                            }
+                          }
+                        }}
+                        className="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-600 hover:bg-red-700 text-white text-[8px] font-bold px-1 py-0.2 rounded shadow-md whitespace-nowrap z-50 cursor-pointer active:cursor-grabbing select-none"
+                        title="Click to rename landmark, drag to change date"
                       >
-                        {landmarkOnDay.name}
+                        {landmarkOnCol.name}
                       </div>
                       <div className="absolute top-0 bottom-0 right-0 w-1 bg-red-600 z-20 pointer-events-none" />
                     </>
                   )}
-                  {day.dayOfMonth}
+                  <div>{col.label}</div>
+                  {viewMode === 'weeks' && (
+                    <div className="text-[8px] text-slate-400 font-normal truncate">{col.subLabel}</div>
+                  )}
                 </th>
               );
             })}
@@ -500,41 +612,41 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                     )}
                   </td>
 
-                  {calendarDays.map((day, dayIdx) => {
+                  {displayCols.map((col, colIdx) => {
                     const stationAllocations = allocationsByStation.get(station.id) || [];
 
-                    // Collect all allocations starting at this day (or active on dayIdx 0)
+                    // Collect all allocations starting in this column (or active on colIdx 0)
                     const allocsStartingHere = stationAllocations.filter(({ alloc }) => {
-                      if (alloc.startDate === day.dateStr) return true;
-                      if (dayIdx === 0 && alloc.startDate < day.dateStr && alloc.endDate >= day.dateStr) return true;
+                      if (col.dates.includes(alloc.startDate)) return true;
+                      if (colIdx === 0 && alloc.startDate < col.startDate && alloc.endDate >= col.startDate) return true;
                       return false;
                     });
 
-                    const landmarkOnDay = landmarks.find((lm) => lm.date === day.dateStr);
+                    const landmarkOnCol = landmarks.find((lm) => col.dates.includes(lm.date));
 
                     if (allocsStartingHere.length > 0) {
-                      // Find max end date index across all allocations starting on this cell
-                      const endIndices = allocsStartingHere.map(({ alloc }) => {
-                        const idx = calendarDays.findIndex((d) => d.dateStr === alloc.endDate);
-                        return idx < 0 ? calendarDays.length - 1 : idx;
+                      // Find max end column index across all allocations starting on this cell
+                      const endColIndices = allocsStartingHere.map(({ alloc }) => {
+                        const idx = displayCols.findIndex((c) => c.dates.includes(alloc.endDate));
+                        return idx < 0 ? displayCols.length - 1 : idx;
                       });
-                      const maxEndIndex = Math.max(...endIndices);
-                      const startIndex = dayIdx;
+                      const maxEndIndex = Math.max(...endColIndices);
+                      const startIndex = colIdx;
                       const colSpan = Math.max(1, maxEndIndex - startIndex + 1);
 
                       return (
                         <td
-                          key={day.dateStr}
+                          key={col.id}
                           colSpan={colSpan}
                           onDragOver={handleDragOver}
-                          onDrop={(e) => handleDrop(e, station.id, day.dateStr)}
+                          onDrop={(e) => handleDrop(e, station.id, col.startDate)}
                           className="p-0.5 border-r border-slate-200 align-middle relative h-12"
                         >
                           {/* Vertical Landmark Launch Line */}
-                          {landmarkOnDay && (
+                          {landmarkOnCol && (
                             <div
                               className="absolute top-0 bottom-0 right-0 w-1 bg-red-600 z-20 pointer-events-none shadow-sm"
-                              title={`Landmark: ${landmarkOnDay.name} (${landmarkOnDay.date})`}
+                              title={`Landmark: ${landmarkOnCol.name} (${landmarkOnCol.date})`}
                             />
                           )}
 
@@ -555,19 +667,24 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                                   }`}
                                   title={`Test: ${test.name} ${test.status === 'completed' ? '(Completed)' : ''}\nVR: ${test.vrNumber || 'N/A'}\nOwner: ${test.testOwner || 'N/A'}\nUnit: ${alloc.unitIndex}/${alloc.totalUnits}\nDates: ${alloc.startDate} to ${alloc.endDate}`}
                                 >
-                                  {/* Left Resize Handle */}
+                                  {/* Left Resize Handle (Draggable & Clickable) */}
                                   {onResizeAllocation && (
-                                    <button
+                                    <div
+                                      draggable
+                                      onDragStart={(e) => {
+                                        e.stopPropagation();
+                                        e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'resize', allocationId: alloc.id, edge: 'start' }));
+                                      }}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         const prevDate = addDays(alloc.startDate, -1);
                                         onResizeAllocation(alloc.id, 'start', prevDate);
                                       }}
-                                      className="absolute left-0 top-0 bottom-0 w-2 bg-black/20 hover:bg-black/40 rounded-l cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[8px]"
-                                      title="Extend duration start earlier"
+                                      className="absolute left-0 top-0 bottom-0 w-2.5 bg-black/30 hover:bg-black/60 rounded-l cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[9px] select-none z-20"
+                                      title="Drag edge or click to expand/shrink start date"
                                     >
                                       ‹
-                                    </button>
+                                    </div>
                                   )}
 
                                   <span className="truncate mr-1 text-[10px] font-semibold drop-shadow-2xs pl-0.5">
@@ -580,19 +697,24 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                                     </span>
                                   </div>
 
-                                  {/* Right Resize Handle */}
+                                  {/* Right Resize Handle (Draggable & Clickable) */}
                                   {onResizeAllocation && (
-                                    <button
+                                    <div
+                                      draggable
+                                      onDragStart={(e) => {
+                                        e.stopPropagation();
+                                        e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'resize', allocationId: alloc.id, edge: 'end' }));
+                                      }}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         const nextDate = addDays(alloc.endDate, 1);
                                         onResizeAllocation(alloc.id, 'end', nextDate);
                                       }}
-                                      className="absolute right-0 top-0 bottom-0 w-2 bg-black/20 hover:bg-black/40 rounded-r cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[8px]"
-                                      title="Extend duration end later"
+                                      className="absolute right-0 top-0 bottom-0 w-2.5 bg-black/30 hover:bg-black/60 rounded-r cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[9px] select-none z-20"
+                                      title="Drag edge or click to expand/shrink end date"
                                     >
                                       ›
-                                    </button>
+                                    </div>
                                   )}
                                 </div>
                               );
@@ -602,11 +724,11 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                       );
                     }
 
-                    // Check if this day is covered by an allocation that started previously
+                    // Check if this column is covered by an allocation that started previously
                     const isCoveredByPrevAlloc = stationAllocations.some(({ alloc }) => {
-                      const startIdx = calendarDays.findIndex((d) => d.dateStr === alloc.startDate);
-                      const effectiveStartIdx = startIdx < 0 ? 0 : startIdx;
-                      return effectiveStartIdx < dayIdx && day.dateStr <= alloc.endDate;
+                      const startColIdx = displayCols.findIndex((c) => c.dates.includes(alloc.startDate));
+                      const effectiveStartColIdx = startColIdx < 0 ? 0 : startColIdx;
+                      return effectiveStartColIdx < colIdx && col.startDate <= alloc.endDate;
                     });
 
                     if (isCoveredByPrevAlloc) {
@@ -615,20 +737,20 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 
                     return (
                       <td
-                        key={day.dateStr}
+                        key={col.id}
                         onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, station.id, day.dateStr)}
-                        onDoubleClick={() => onDoubleClickCell && onDoubleClickCell(station.id, day.dateStr)}
+                        onDrop={(e) => handleDrop(e, station.id, col.startDate)}
+                        onDoubleClick={() => onDoubleClickCell && onDoubleClickCell(station.id, col.startDate)}
                         className={`border-r border-slate-200 transition-colors hover:bg-blue-100/60 cursor-pointer relative ${
-                          day.isWeekend ? 'bg-slate-100/60' : ''
+                          col.isWeekend ? 'bg-slate-100/60' : ''
                         }`}
                         title="Double-click to add test starting on this date"
                       >
                         {/* Vertical Landmark Launch Line */}
-                        {landmarkOnDay && (
+                        {landmarkOnCol && (
                           <div
                             className="absolute top-0 bottom-0 right-0 w-1 bg-red-600 z-20 pointer-events-none shadow-sm"
-                            title={`Landmark: ${landmarkOnDay.name} (${landmarkOnDay.date})`}
+                            title={`Landmark: ${landmarkOnCol.name} (${landmarkOnCol.date})`}
                           />
                         )}
                       </td>
