@@ -56,9 +56,6 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
 
   const [newTechLocation, setNewTechLocation] = useState('Mty');
 
-  const [selectedLabForStation, setSelectedLabForStation] = useState<string>(labs[0]?.id || '');
-  const [newStationNameInput, setNewStationNameInput] = useState('');
-
   const [newTestTypeName, setNewTestTypeName] = useState('');
   const [newTestTypeLabel, setNewTestTypeLabel] = useState('');
   const [newTestTypeColor, setNewTestTypeColor] = useState('#2563eb');
@@ -403,170 +400,172 @@ export const LabConfigModal: React.FC<LabConfigModalProps> = ({
           {/* TAB 2: STATIONS & CAPABILITIES */}
           {activeTab === 'stations' && (
             <div className="space-y-4">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
-                <h3 className="font-bold text-slate-800">Add New Station to Lab</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  <select
-                    value={selectedLabForStation || localLabs[0]?.id || ''}
-                    onChange={(e) => setSelectedLabForStation(e.target.value)}
-                    className="px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
-                  >
-                    {localLabs.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    placeholder="Station Name (Optional)"
-                    value={newStationNameInput}
-                    onChange={(e) => setNewStationNameInput(e.target.value)}
-                    className="px-2.5 py-1.5 border border-slate-300 rounded font-sans text-xs bg-white"
-                  />
-                  <button
-                    onClick={() => {
-                      const labId = selectedLabForStation || localLabs[0]?.id;
-                      if (labId) {
-                        handleAddStationToLab(labId, newStationNameInput);
-                        setNewStationNameInput('');
-                      }
-                    }}
-                    className="px-3 py-1.5 bg-blue-600 text-white font-bold rounded text-xs flex items-center gap-1 hover:bg-blue-500 cursor-pointer justify-center"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add Station
-                  </button>
-                </div>
-              </div>
+              <div className="space-y-4">
+                {localLabs.map((lab) => {
+                  const labStations = localStations
+                    .filter((s) => s.labId === lab.id)
+                    .sort((a, b) => a.stationNumber - b.stationNumber);
 
-              <div className="space-y-3">
-                {localStations.map((station) => {
-                  const lab = localLabs.find((l) => l.id === station.labId);
                   return (
-                    <div key={station.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between border-b pb-1 font-bold text-slate-800">
-                        <span>{station.name} ({lab?.name})</span>
+                    <div key={lab.id} className="bg-slate-50 border border-slate-300 rounded-xl p-4 space-y-3 shadow-xs">
+                      {/* Lab Header */}
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 text-sm">{lab.name}</span>
+                          <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded font-mono">
+                            {lab.location || 'Mty'}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            ({labStations.length} station{labStations.length !== 1 ? 's' : ''})
+                          </span>
+                        </div>
+
                         <button
-                          onClick={() => handleDeleteStation(station.id)}
-                          className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
-                          title="Delete Station"
+                          onClick={() => handleAddStationToLab(lab.id)}
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-xs flex items-center gap-1 cursor-pointer"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Plus className="h-3.5 w-3.5" /> Add Station to {lab.name}
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="font-semibold text-slate-600 block mb-1">Station Number (Unique per Lab):</label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={99}
-                            value={station.stationNumber}
-                            onChange={(e) => {
-                              const newNum = parseInt(e.target.value) || 1;
-                              const hasDuplicate = localStations.some(
-                                (s) => s.labId === station.labId && s.id !== station.id && s.stationNumber === newNum
-                              );
-                              if (hasDuplicate) {
-                                alert(`Station number ${newNum} is already assigned in ${lab?.name}. Station numbers must be unique within each lab!`);
-                                return;
-                              }
-                              setLocalStations(
-                                localStations.map((s) =>
-                                  s.id === station.id ? { ...s, stationNumber: newNum } : s
-                                )
-                              );
-                            }}
-                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs font-mono text-center font-bold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="font-semibold text-slate-600 block mb-1">Station Name:</label>
-                          <input
-                            type="text"
-                            value={station.name}
-                            onChange={(e) => {
-                              setLocalStations(
-                                localStations.map((s) =>
-                                  s.id === station.id ? { ...s, name: e.target.value } : s
-                                )
-                              );
-                            }}
-                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="font-semibold text-slate-600 block mb-1">Station Comments:</label>
-                          <input
-                            type="text"
-                            value={station.comments || ''}
-                            onChange={(e) => {
-                              setLocalStations(
-                                localStations.map((s) =>
-                                  s.id === station.id ? { ...s, comments: e.target.value } : s
-                                )
-                              );
-                            }}
-                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Capabilities List */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="font-semibold text-slate-600">Station Capabilities & Sensors:</label>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newCapName = prompt('Enter capability name (e.g. Thermistor 1, Scale, Humidity Sensor):');
-                              if (!newCapName) return;
-                              const newCapComment = prompt('Enter comments for this capability:') || '';
-                              const newCap: StationCapability = {
-                                id: `cap-${Date.now()}`,
-                                name: newCapName,
-                                comments: newCapComment,
-                              };
-                              const updatedCaps = [...(station.capabilities || []), newCap];
-                              setLocalStations(
-                                localStations.map((s) =>
-                                  s.id === station.id ? { ...s, capabilities: updatedCaps } : s
-                                )
-                              );
-                            }}
-                            className="text-[10px] text-blue-600 hover:underline font-bold cursor-pointer"
-                          >
-                            + Add Capability
-                          </button>
-                        </div>
-
-                        <div className="flex flex-wrap gap-1.5">
-                          {(station.capabilities || []).map((cap) => (
-                            <div key={cap.id} className="bg-emerald-50 border border-emerald-200 px-2 py-1 rounded text-[11px] flex items-center gap-2">
-                              <div>
-                                <span className="font-bold text-emerald-900">{cap.name}</span>
-                                {cap.comments && <span className="text-emerald-700 italic block text-[9px]">{cap.comments}</span>}
+                      {/* Stations in this Lab */}
+                      {labStations.length === 0 ? (
+                        <p className="text-slate-400 italic text-xs py-2">
+                          No stations assigned to this lab yet. Click "Add Station to {lab.name}" above.
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {labStations.map((station) => (
+                            <div key={station.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 shadow-2xs">
+                              <div className="flex items-center justify-between border-b pb-1 font-bold text-slate-800">
+                                <span className="text-xs text-blue-900">
+                                  Station {station.stationNumber} — {station.name}
+                                </span>
+                                <button
+                                  onClick={() => handleDeleteStation(station.id)}
+                                  className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
+                                  title="Delete Station"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
                               </div>
-                              <button
-                                onClick={() => {
-                                  const updatedCaps = (station.capabilities || []).filter((c) => c.id !== cap.id);
-                                  setLocalStations(
-                                    localStations.map((s) =>
-                                      s.id === station.id ? { ...s, capabilities: updatedCaps } : s
-                                    )
-                                  );
-                                }}
-                                className="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer"
-                              >
-                                ✕
-                              </button>
+
+                              <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                  <label className="font-semibold text-slate-600 block mb-1">Station # (Unique per Lab):</label>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={99}
+                                    value={station.stationNumber}
+                                    onChange={(e) => {
+                                      const newNum = parseInt(e.target.value) || 1;
+                                      const hasDuplicate = localStations.some(
+                                        (s) => s.labId === station.labId && s.id !== station.id && s.stationNumber === newNum
+                                      );
+                                      if (hasDuplicate) {
+                                        alert(`Station number ${newNum} is already assigned in ${lab.name}. Station numbers must be unique within each lab!`);
+                                        return;
+                                      }
+                                      setLocalStations(
+                                        localStations.map((s) =>
+                                          s.id === station.id ? { ...s, stationNumber: newNum } : s
+                                        )
+                                      );
+                                    }}
+                                    className="w-full px-2 py-1 border border-slate-300 rounded text-xs font-mono text-center font-bold"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="font-semibold text-slate-600 block mb-1">Station Name:</label>
+                                  <input
+                                    type="text"
+                                    value={station.name}
+                                    onChange={(e) => {
+                                      setLocalStations(
+                                        localStations.map((s) =>
+                                          s.id === station.id ? { ...s, name: e.target.value } : s
+                                        )
+                                      );
+                                    }}
+                                    className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="font-semibold text-slate-600 block mb-1">Station Comments:</label>
+                                  <input
+                                    type="text"
+                                    value={station.comments || ''}
+                                    onChange={(e) => {
+                                      setLocalStations(
+                                        localStations.map((s) =>
+                                          s.id === station.id ? { ...s, comments: e.target.value } : s
+                                        )
+                                      );
+                                    }}
+                                    className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Capabilities List */}
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="font-semibold text-slate-600">Station Capabilities & Sensors:</label>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newCapName = prompt('Enter capability name (e.g. Thermistor 1, Scale, Humidity Sensor):');
+                                      if (!newCapName) return;
+                                      const newCapComment = prompt('Enter comments for this capability:') || '';
+                                      const newCap: StationCapability = {
+                                        id: `cap-${Date.now()}`,
+                                        name: newCapName,
+                                        comments: newCapComment,
+                                      };
+                                      const updatedCaps = [...(station.capabilities || []), newCap];
+                                      setLocalStations(
+                                        localStations.map((s) =>
+                                          s.id === station.id ? { ...s, capabilities: updatedCaps } : s
+                                        )
+                                      );
+                                    }}
+                                    className="text-[10px] text-blue-600 hover:underline font-bold cursor-pointer"
+                                  >
+                                    + Add Capability
+                                  </button>
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5">
+                                  {(station.capabilities || []).map((cap) => (
+                                    <div key={cap.id} className="bg-emerald-50 border border-emerald-200 px-2 py-1 rounded text-[11px] flex items-center gap-2">
+                                      <div>
+                                        <span className="font-bold text-emerald-900">{cap.name}</span>
+                                        {cap.comments && <span className="text-emerald-700 italic block text-[9px]">{cap.comments}</span>}
+                                      </div>
+                                      <button
+                                        onClick={() => {
+                                          const updatedCaps = (station.capabilities || []).filter((c) => c.id !== cap.id);
+                                          setLocalStations(
+                                            localStations.map((s) =>
+                                              s.id === station.id ? { ...s, capabilities: updatedCaps } : s
+                                            )
+                                          );
+                                        }}
+                                        className="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}

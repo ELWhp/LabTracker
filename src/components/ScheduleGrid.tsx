@@ -8,7 +8,7 @@ import type {
   Landmark,
 } from '../types/labTracker';
 import { LAB_TYPE_LABELS } from '../types/labTracker';
-import { addWorkingDays, addDays } from '../utils/labTrackerUtils';
+import { addWorkingDays, addDays, calculateWorkingDaysBetween } from '../utils/labTrackerUtils';
 import { Info, Cpu, FileText } from 'lucide-react';
 
 interface ScheduleGridProps {
@@ -189,7 +189,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       const test = testMap.get(draggedAlloc.testId);
       if (!test) return;
 
-      const newEndDate = addWorkingDays(targetDateStr, test.durationDays);
+      const unitDuration = calculateWorkingDaysBetween(draggedAlloc.startDate, draggedAlloc.endDate);
+      const newEndDate = addWorkingDays(targetDateStr, unitDuration);
       const targetStationAllocations = allocationsByStation.get(targetStationId) || [];
 
       const hasCollision = targetStationAllocations.some(({ alloc }) => {
@@ -305,12 +306,12 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
         </div>
       )}
 
-      <table className="w-full border-collapse text-xs select-none" style={{ tableLayout: 'fixed' }}>
+      <table className="w-full border-collapse text-xs select-none">
         <colgroup>
-          <col style={{ width: `${labColWidth}px` }} />
-          <col style={{ width: `${stationColWidth}px` }} />
+          <col style={{ width: `${labColWidth}px`, minWidth: `${labColWidth}px` }} />
+          <col style={{ width: `${stationColWidth}px`, minWidth: `${stationColWidth}px` }} />
           {calendarDays.map((d) => (
-            <col key={d.dateStr} style={{ width: cellWidth }} />
+            <col key={d.dateStr} style={{ minWidth: cellWidth }} />
           ))}
         </colgroup>
 
@@ -502,28 +503,24 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                   {calendarDays.map((day, dayIdx) => {
                     const stationAllocations = allocationsByStation.get(station.id) || [];
 
-                    const allocStartingHere = stationAllocations.find(({ alloc }) => {
+                    // Collect all allocations starting at this day (or active on dayIdx 0)
+                    const allocsStartingHere = stationAllocations.filter(({ alloc }) => {
                       if (alloc.startDate === day.dateStr) return true;
                       if (dayIdx === 0 && alloc.startDate < day.dateStr && alloc.endDate >= day.dateStr) return true;
                       return false;
                     });
 
-                    const isCoveredByAlloc = stationAllocations.some(
-                      ({ alloc }) => day.dateStr >= alloc.startDate && day.dateStr <= alloc.endDate
-                    );
-
                     const landmarkOnDay = landmarks.find((lm) => lm.date === day.dateStr);
 
-                    if (allocStartingHere) {
-                      const { alloc, test } = allocStartingHere;
-                      let startIndex = calendarDays.findIndex((d) => d.dateStr === alloc.startDate);
-                      let endIndex = calendarDays.findIndex((d) => d.dateStr === alloc.endDate);
-
-                      if (startIndex < 0) startIndex = 0;
-                      if (endIndex < 0) endIndex = calendarDays.length - 1;
-
-                      const colSpan = Math.max(1, endIndex - startIndex + 1);
-                      const isSelected = selectedAllocationId === alloc.id;
+                    if (allocsStartingHere.length > 0) {
+                      // Find max end date index across all allocations starting on this cell
+                      const endIndices = allocsStartingHere.map(({ alloc }) => {
+                        const idx = calendarDays.findIndex((d) => d.dateStr === alloc.endDate);
+                        return idx < 0 ? calendarDays.length - 1 : idx;
+                      });
+                      const maxEndIndex = Math.max(...endIndices);
+                      const startIndex = dayIdx;
+                      const colSpan = Math.max(1, maxEndIndex - startIndex + 1);
 
                       return (
                         <td
@@ -531,9 +528,9 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                           colSpan={colSpan}
                           onDragOver={handleDragOver}
                           onDrop={(e) => handleDrop(e, station.id, day.dateStr)}
-                          className="p-0.5 border-r border-slate-200 align-middle relative h-10"
+                          className="p-0.5 border-r border-slate-200 align-middle relative h-12"
                         >
-                          {/* Vertical Landmark Launch Line (z-20: above test blocks z-10, behind sticky cols z-30) */}
+                          {/* Vertical Landmark Launch Line */}
                           {landmarkOnDay && (
                             <div
                               className="absolute top-0 bottom-0 right-0 w-1 bg-red-600 z-20 pointer-events-none shadow-sm"
@@ -541,63 +538,78 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                             />
                           )}
 
-                          <div
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, alloc)}
-                            onClick={() => onSelectAllocation(alloc, test)}
-                            style={{ backgroundColor: test.status === 'completed' ? '#94a3b8' : test.color || '#2563eb' }}
-                            className={`h-full w-full rounded px-1 text-white font-medium flex items-center justify-between cursor-grab active:cursor-grabbing shadow-2xs transition-all hover:brightness-110 relative group z-10 ${
-                              test.status === 'completed' ? 'opacity-80' : ''
-                            } ${
-                              isSelected ? 'ring-2 ring-black ring-offset-1 z-10' : ''
-                            }`}
-                            title={`Test: ${test.name} ${test.status === 'completed' ? '(Completed)' : ''}\nVR: ${test.vrNumber || 'N/A'}\nOwner: ${test.testOwner || 'N/A'}\nUnit: ${alloc.unitIndex}/${alloc.totalUnits}\nDates: ${alloc.startDate} to ${alloc.endDate}`}
-                          >
-                            {/* Left Resize Handle */}
-                            {onResizeAllocation && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const prevDate = addDays(alloc.startDate, -1);
-                                  onResizeAllocation(alloc.id, 'start', prevDate);
-                                }}
-                                className="absolute left-0 top-0 bottom-0 w-2 bg-black/20 hover:bg-black/40 rounded-l cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[8px]"
-                                title="Extend duration start earlier"
-                              >
-                                ‹
-                              </button>
-                            )}
+                          <div className="flex flex-col gap-0.5 h-full w-full justify-center">
+                            {allocsStartingHere.map(({ alloc, test }) => {
+                              const isSelected = selectedAllocationId === alloc.id;
+                              return (
+                                <div
+                                  key={alloc.id}
+                                  draggable
+                                  onDragStart={(e) => handleDragStart(e, alloc)}
+                                  onClick={() => onSelectAllocation(alloc, test)}
+                                  style={{ backgroundColor: test.status === 'completed' ? '#94a3b8' : test.color || '#2563eb' }}
+                                  className={`h-full min-h-[22px] w-full rounded px-1 text-white font-medium flex items-center justify-between cursor-grab active:cursor-grabbing shadow-2xs transition-all hover:brightness-110 relative group z-10 ${
+                                    test.status === 'completed' ? 'opacity-80' : ''
+                                  } ${
+                                    isSelected ? 'ring-2 ring-black ring-offset-1 z-10' : ''
+                                  }`}
+                                  title={`Test: ${test.name} ${test.status === 'completed' ? '(Completed)' : ''}\nVR: ${test.vrNumber || 'N/A'}\nOwner: ${test.testOwner || 'N/A'}\nUnit: ${alloc.unitIndex}/${alloc.totalUnits}\nDates: ${alloc.startDate} to ${alloc.endDate}`}
+                                >
+                                  {/* Left Resize Handle */}
+                                  {onResizeAllocation && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const prevDate = addDays(alloc.startDate, -1);
+                                        onResizeAllocation(alloc.id, 'start', prevDate);
+                                      }}
+                                      className="absolute left-0 top-0 bottom-0 w-2 bg-black/20 hover:bg-black/40 rounded-l cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[8px]"
+                                      title="Extend duration start earlier"
+                                    >
+                                      ‹
+                                    </button>
+                                  )}
 
-                            <span className="truncate mr-1 text-[10px] font-semibold drop-shadow-2xs pl-0.5">
-                              {test.name}
-                            </span>
+                                  <span className="truncate mr-1 text-[10px] font-semibold drop-shadow-2xs pl-0.5">
+                                    {test.name}
+                                  </span>
 
-                            <div className="flex items-center gap-0.5 shrink-0">
-                              <span className="bg-black/30 text-white font-mono text-[8px] px-1 py-0.2 rounded">
-                                {alloc.unitIndex}/{alloc.totalUnits}
-                              </span>
-                            </div>
+                                  <div className="flex items-center gap-0.5 shrink-0">
+                                    <span className="bg-black/30 text-white font-mono text-[8px] px-1 py-0.2 rounded font-bold">
+                                      {alloc.unitIndex}/{alloc.totalUnits}
+                                    </span>
+                                  </div>
 
-                            {/* Right Resize Handle */}
-                            {onResizeAllocation && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const nextDate = addDays(alloc.endDate, 1);
-                                  onResizeAllocation(alloc.id, 'end', nextDate);
-                                }}
-                                className="absolute right-0 top-0 bottom-0 w-2 bg-black/20 hover:bg-black/40 rounded-r cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[8px]"
-                                title="Extend duration end later"
-                              >
-                                ›
-                              </button>
-                            )}
+                                  {/* Right Resize Handle */}
+                                  {onResizeAllocation && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const nextDate = addDays(alloc.endDate, 1);
+                                        onResizeAllocation(alloc.id, 'end', nextDate);
+                                      }}
+                                      className="absolute right-0 top-0 bottom-0 w-2 bg-black/20 hover:bg-black/40 rounded-r cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[8px]"
+                                      title="Extend duration end later"
+                                    >
+                                      ›
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </td>
                       );
                     }
 
-                    if (isCoveredByAlloc) {
+                    // Check if this day is covered by an allocation that started previously
+                    const isCoveredByPrevAlloc = stationAllocations.some(({ alloc }) => {
+                      const startIdx = calendarDays.findIndex((d) => d.dateStr === alloc.startDate);
+                      const effectiveStartIdx = startIdx < 0 ? 0 : startIdx;
+                      return effectiveStartIdx < dayIdx && day.dateStr <= alloc.endDate;
+                    });
+
+                    if (isCoveredByPrevAlloc) {
                       return null;
                     }
 

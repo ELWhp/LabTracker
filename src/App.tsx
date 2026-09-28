@@ -266,10 +266,12 @@ export function App() {
   ) => {
     setTests(
       tests.map((t) => {
-        const hasAlloc = t.unitAllocations.some((a) => a.id === allocationId);
-        if (!hasAlloc) return t;
+        const targetAlloc = t.unitAllocations.find((a) => a.id === allocationId);
+        if (!targetAlloc) return t;
 
-        const newEndDate = addWorkingDays(newStartDate, t.durationDays);
+        // Preserve individual unit's duration (working days)
+        const unitDuration = calculateWorkingDaysBetween(targetAlloc.startDate, targetAlloc.endDate);
+        const newEndDate = addWorkingDays(newStartDate, unitDuration);
 
         const updatedAllocations = t.unitAllocations.map((a) => {
           if (a.id !== allocationId) return a;
@@ -369,13 +371,13 @@ export function App() {
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
       {/* Sleek Compact Main Navbar Header */}
       <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30">
-        <div className="max-w-[98%] w-full mx-auto px-4 py-2 flex items-center justify-between gap-4">
+        <div className="max-w-[98%] w-full mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center space-x-3 shrink-0">
             <div className="p-1 bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-center">
-              <CustomLabGridIcon size={34} />
+              <CustomLabGridIcon size={32} />
             </div>
             <div>
-              <h1 className="text-base font-bold tracking-tight leading-none">
+              <h1 className="text-sm font-bold tracking-tight leading-none">
                 Lab Tracker & Resource Manager
               </h1>
               <p className="text-[10px] text-slate-400 mt-0.5">
@@ -388,7 +390,7 @@ export function App() {
           <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700 space-x-1 shrink-0">
             <button
               onClick={() => setActiveTab('labs')}
-              className={`px-3 py-1.5 font-bold text-xs rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-2.5 py-1 font-bold text-xs rounded-md flex items-center gap-1 transition-colors cursor-pointer ${
                 activeTab === 'labs'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
@@ -400,7 +402,7 @@ export function App() {
 
             <button
               onClick={() => setActiveTab('techs')}
-              className={`px-3 py-1.5 font-bold text-xs rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-2.5 py-1 font-bold text-xs rounded-md flex items-center gap-1 transition-colors cursor-pointer ${
                 activeTab === 'techs'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
@@ -411,16 +413,16 @@ export function App() {
             </button>
           </div>
 
-          {/* Action Buttons & Full-Width User Email Field */}
-          <div className="flex items-center space-x-2 shrink-0">
-            <div className="flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
+          {/* Action Buttons & User Email Field */}
+          <div className="flex items-center space-x-2 shrink-0 flex-wrap">
+            <div className="flex items-center gap-1 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 text-xs">
               <Users className="h-3.5 w-3.5 text-blue-400 shrink-0" />
               <span className="text-slate-400 text-[11px] shrink-0">User:</span>
               <input
                 type="text"
                 value={currentUserEmail}
                 onChange={(e) => setCurrentUserEmail(e.target.value)}
-                className="bg-transparent text-white font-mono text-xs focus:outline-none min-w-[260px] w-72"
+                className="bg-transparent text-white font-mono text-xs focus:outline-none w-44"
                 title="Current active user for edit audit logging & owner notices"
               />
             </div>
@@ -570,6 +572,7 @@ export function App() {
             <MonitoringTable
               tests={tests}
               testTypes={testTypes}
+              resources={resources}
               calendarDays={calendarDays}
               onUpdateTest={handleUpdateTest}
               onDeleteTest={handleDeleteTest}
