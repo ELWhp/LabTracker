@@ -1,6 +1,6 @@
 import React from 'react';
 import type { UnitAllocation, LabTest, Lab, Station } from '../types/labTracker';
-import { X, Calendar, User, FileCode, ExternalLink, Cpu, History } from 'lucide-react';
+import { X, Calendar, User, FileCode, ExternalLink, Cpu, History, Edit2 } from 'lucide-react';
 
 interface SidePanelProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface SidePanelProps {
   labs: Lab[];
   stations: Station[];
   onUpdateAllocation: (updatedAllocation: UnitAllocation) => void;
+  onEditTest?: (test: LabTest) => void;
 }
 
 export const SidePanel: React.FC<SidePanelProps> = ({
@@ -20,6 +21,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   labs,
   stations,
   onUpdateAllocation,
+  onEditTest,
 }) => {
   if (!isOpen || !allocation || !test) return null;
 
@@ -40,12 +42,24 @@ export const SidePanel: React.FC<SidePanelProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors cursor-pointer"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className="flex items-center space-x-1">
+          {onEditTest && (
+            <button
+              onClick={() => onEditTest(test)}
+              className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded flex items-center gap-1 transition-colors cursor-pointer"
+              title="Open full test edit window"
+            >
+              <Edit2 className="h-3.5 w-3.5" /> Edit Test
+            </button>
+          )}
+
+          <button
+            onClick={onClose}
+            className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors cursor-pointer"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       {/* Body Content */}

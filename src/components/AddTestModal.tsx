@@ -94,14 +94,32 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
     const unitAllocations: UnitAllocation[] = [];
     const endDate = addWorkingDays(startDate, durationDays);
 
+    const availableStations = [...matchingStations];
+    const chosenStationIds: string[] = [];
+
     for (let i = 1; i <= units; i++) {
-      const station = matchingStations[(i - 1) % (matchingStations.length || 1)];
+      let stationId: string;
+      if (i === 1 && prefilledStationId) {
+        stationId = prefilledStationId;
+      } else {
+        // Pick an unassigned station from availableStations if possible to avoid putting multi-units on the same station
+        const remainingStations = availableStations.filter((s) => !chosenStationIds.includes(s.id));
+        if (remainingStations.length > 0) {
+          stationId = remainingStations[0].id;
+        } else {
+          // Wrap around if units exceed total stations in lab
+          const fallbackIndex = (i - 1) % (availableStations.length || 1);
+          stationId = availableStations[fallbackIndex]?.id || assignedStationId;
+        }
+      }
+      chosenStationIds.push(stationId);
+
       unitAllocations.push({
         id: `alloc-${testId}-${i}`,
         testId,
         unitIndex: i,
         totalUnits: units,
-        stationId: i === 1 && prefilledStationId ? assignedStationId : station ? station.id : assignedStationId,
+        stationId,
         startDate,
         endDate,
       });

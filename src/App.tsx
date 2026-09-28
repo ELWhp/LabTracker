@@ -19,6 +19,7 @@ import {
 import { ScheduleGrid } from './components/ScheduleGrid';
 import { ResourceAlertBanner } from './components/ResourceAlertBanner';
 import { MonitoringTable } from './components/MonitoringTable';
+import { EditTestModal } from './components/EditTestModal';
 import { AddTestModal } from './components/AddTestModal';
 import { LabConfigModal } from './components/LabConfigModal';
 import { SidePanel } from './components/SidePanel';
@@ -37,6 +38,7 @@ import {
   AlertTriangle,
   Users,
   LayoutGrid,
+  RotateCcw,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -94,6 +96,76 @@ export function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Undo History Stack for Ctrl+Z
+  const [undoStack, setUndoStack] = useState<{
+    labs: Lab[];
+    stations: Station[];
+    resources: PersonnelResource[];
+    tests: LabTest[];
+    testTypes: TestTypeConfig[];
+    landmarks: Landmark[];
+  }[]>([]);
+
+  const pushUndoState = () => {
+    setUndoStack((prev) => [
+      ...prev.slice(-20), // limit stack depth to 20
+      {
+        labs,
+        stations,
+        resources,
+        tests,
+        testTypes,
+        landmarks,
+      },
+    ]);
+  };
+
+  const handleUndo = () => {
+    if (undoStack.length === 0) return;
+    const previous = undoStack[undoStack.length - 1];
+    setUndoStack((prev) => prev.slice(0, prev.length - 1));
+
+    setLabs(previous.labs);
+    setStations(previous.stations);
+    setResources(previous.resources);
+    setTests(previous.tests);
+    setTestTypes(previous.testTypes);
+    setLandmarks(previous.landmarks);
+    setHasUnsavedChanges(true);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        const activeElem = document.activeElement;
+        if (
+          activeElem &&
+          (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.tagName === 'SELECT')
+        ) {
+          return;
+        }
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undoStack, labs, stations, resources, tests, testTypes, landmarks]);
+
+  const handleResetSession = () => {
+    if (confirm('Are you sure you want to reset current session to initial mock data? Any unsaved changes will be cleared.')) {
+      pushUndoState();
+      const initial = createInitialMockData();
+      setLabs(initial.labs);
+      setStations(initial.stations);
+      setResources(initial.resources);
+      setTests(initial.tests);
+      setTestTypes(initial.testTypes);
+      setLandmarks(initial.landmarks);
+      setHasUnsavedChanges(true);
+    }
+  };
+
   const [startDateStr, setStartDateStr] = useState<string>(() => {
     const today = new Date();
     const y = today.getFullYear();
@@ -102,7 +174,16 @@ export function App() {
     return `${y}-${m}-${d}`;
   });
 
-  const [daysCount, setDaysCount] = useState<number>(30);
+  const [daysCount, setDaysCount] = useState<number>(() => {
+    const saved = localStorage.getItem('labtracker_days_count');
+    return saved ? parseInt(saved, 10) || 30 : 30;
+  });
+
+  const [selectedLabId, setSelectedLabId] = useState<string>('all');
+
+  useEffect(() => {
+    localStorage.setItem('labtracker_days_count', String(daysCount));
+  }, [daysCount]);
   const [viewMode, setViewMode] = useState<'days' | 'weeks'>('days');
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -113,6 +194,8 @@ export function App() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [selectedAllocationId, setSelectedAllocationId] = useState<string | null>(null);
+
+  const [testToEditFromPanel, setTestToEditFromPanel] = useState<LabTest | null>(null);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -186,11 +269,13 @@ export function App() {
   };
 
   const handleAddTest = (newTest: LabTest) => {
+    pushUndoState();
     setTests([...tests, newTest]);
     setHasUnsavedChanges(true);
   };
 
   const handleUpdateTest = (updatedTest: LabTest) => {
+    pushUndoState();
     setTests(
       tests.map((t) => {
         if (t.id !== updatedTest.id) return t;
@@ -206,17 +291,24 @@ export function App() {
           if (updatedTest.units < t.units) {
             updatedAllocations = t.unitAllocations.slice(0, updatedTest.units);
           } else {
+            const existingStationIds = t.unitAllocations.map((a) => a.stationId);
             const toAdd = updatedTest.units - t.units;
             const newAllocations: UnitAllocation[] = [];
             for (let i = 1; i <= toAdd; i++) {
               const uIdx = t.units + i;
-              const station = matchingStations[(uIdx - 1) % (matchingStations.length || 1)];
+              const unusedStations = matchingStations.filter((s) => !existingStationIds.includes(s.id));
+              const stationId = unusedStations.length > 0
+                ? unusedStations[0].id
+                : (matchingStations[(uIdx - 1) % (matchingStations.length || 1)]?.id || 'st-1-1');
+
+              existingStationIds.push(stationId);
+
               newAllocations.push({
                 id: `alloc-${updatedTest.id}-${uIdx}`,
                 testId: updatedTest.id,
                 unitIndex: uIdx,
                 totalUnits: updatedTest.units,
-                stationId: station ? station.id : 'st-1-1',
+                stationId,
                 startDate: updatedTest.startDate,
                 endDate: addWorkingDays(updatedTest.startDate, updatedTest.durationDays),
               });
@@ -251,6 +343,7 @@ export function App() {
 
   const handleDeleteTest = (testId: string) => {
     if (confirm('Are you sure you want to delete this test?')) {
+      pushUndoState();
       setTests(tests.filter((t) => t.id !== testId));
       if (selectedTest?.id === testId) {
         setSelectedAllocationId(null);
@@ -264,6 +357,7 @@ export function App() {
     newStationId: string,
     newStartDate: string
   ) => {
+    pushUndoState();
     setTests(
       tests.map((t) => {
         const targetAlloc = t.unitAllocations.find((a) => a.id === allocationId);
@@ -304,6 +398,7 @@ export function App() {
     edge: 'start' | 'end',
     newDateStr: string
   ) => {
+    pushUndoState();
     setTests(
       tests.map((t) => {
         const targetAlloc = t.unitAllocations.find((a) => a.id === allocationId);
@@ -439,6 +534,14 @@ export function App() {
             </button>
 
             <button
+              onClick={handleResetSession}
+              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-red-300 font-semibold text-xs rounded-lg border border-slate-700 flex items-center gap-1 transition-colors cursor-pointer"
+              title="Reset session to default baseline data"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Reset Session
+            </button>
+
+            <button
               onClick={() => setIsHistoryModalOpen(true)}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
@@ -527,6 +630,22 @@ export function App() {
                   </select>
                 </div>
 
+                <div className="flex items-center gap-2">
+                  <label className="font-semibold text-slate-700">Filter by Lab:</label>
+                  <select
+                    value={selectedLabId}
+                    onChange={(e) => setSelectedLabId(e.target.value)}
+                    className="px-2.5 py-1 border border-slate-300 rounded text-xs bg-white font-semibold text-slate-800"
+                  >
+                    <option value="all">All Labs ({labs.length})</option>
+                    {labs.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded border border-slate-200">
                   <button
                     onClick={() => setViewMode('days')}
@@ -561,6 +680,7 @@ export function App() {
               landmarks={landmarks}
               calendarDays={calendarDays}
               viewMode={viewMode}
+              selectedLabId={selectedLabId}
               selectedAllocationId={selectedAllocationId}
               onSelectAllocation={(alloc) => setSelectedAllocationId(alloc.id)}
               onUpdateAllocationDates={handleUpdateAllocationDates}
@@ -568,6 +688,16 @@ export function App() {
               onDoubleClickCell={handleDoubleClickCell}
               onUpdateLandmark={(updatedLm) => {
                 setLandmarks(landmarks.map((lm) => (lm.id === updatedLm.id ? updatedLm : lm)));
+                setHasUnsavedChanges(true);
+              }}
+              onUpdateStationComments={(stationId, comments) => {
+                pushUndoState();
+                setStations(stations.map((s) => (s.id === stationId ? { ...s, comments } : s)));
+                setHasUnsavedChanges(true);
+              }}
+              onUpdateLabComments={(labId, comments) => {
+                pushUndoState();
+                setLabs(labs.map((l) => (l.id === labId ? { ...l, comments } : l)));
                 setHasUnsavedChanges(true);
               }}
             />
@@ -605,6 +735,17 @@ export function App() {
         labs={labs}
         stations={stations}
         onUpdateAllocation={handleUpdateSingleAllocation}
+        onEditTest={(t) => setTestToEditFromPanel(t)}
+      />
+
+      {/* Edit Test Miniwindow triggered from Side Panel */}
+      <EditTestModal
+        isOpen={testToEditFromPanel !== null}
+        onClose={() => setTestToEditFromPanel(null)}
+        test={testToEditFromPanel}
+        resources={resources}
+        testTypes={testTypes}
+        onSaveTest={handleUpdateTest}
       />
 
       {/* Modals */}

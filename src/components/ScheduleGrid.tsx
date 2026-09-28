@@ -18,6 +18,7 @@ interface ScheduleGridProps {
   landmarks?: Landmark[];
   calendarDays: CalendarDay[];
   viewMode?: 'days' | 'weeks';
+  selectedLabId?: string;
   selectedAllocationId: string | null;
   onSelectAllocation: (allocation: UnitAllocation, test: LabTest) => void;
   onUpdateAllocationDates: (
@@ -32,6 +33,8 @@ interface ScheduleGridProps {
   ) => void;
   onDoubleClickCell?: (stationId: string, dateStr: string) => void;
   onUpdateLandmark?: (landmark: Landmark) => void;
+  onUpdateStationComments?: (stationId: string, comments: string) => void;
+  onUpdateLabComments?: (labId: string, comments: string) => void;
 }
 
 interface DisplayColumn {
@@ -55,11 +58,15 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
   landmarks = [],
   calendarDays,
   viewMode = 'days',
+  selectedLabId = 'all',
   selectedAllocationId,
   onSelectAllocation,
   onUpdateAllocationDates,
   onResizeAllocation,
   onDoubleClickCell,
+  onUpdateLandmark,
+  onUpdateStationComments,
+  onUpdateLabComments,
 }) => {
   const testMap = new Map<string, LabTest>(tests.map((t) => [t.id, t]));
 
@@ -316,20 +323,22 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     return 10;
   };
 
-  // Sort Labs hierarchically: 1. By Location, 2. Washers First (Energy then Performance), then Dryers, 3. By Lab Name
-  const sortedLabs = [...labs].sort((a, b) => {
-    const locA = a.location || 'Mty';
-    const locB = b.location || 'Mty';
-    if (locA !== locB) {
-      return locA.localeCompare(locB);
-    }
-    const prioA = getLabTypePriority(a.type, a.name);
-    const prioB = getLabTypePriority(b.type, b.name);
-    if (prioA !== prioB) {
-      return prioA - prioB;
-    }
-    return a.name.localeCompare(b.name);
-  });
+  // Filter and sort Labs hierarchically: 1. By Location, 2. Washers First (Energy then Performance), then Dryers, 3. By Lab Name
+  const sortedLabs = [...labs]
+    .filter((l) => selectedLabId === 'all' || l.id === selectedLabId)
+    .sort((a, b) => {
+      const locA = a.location || 'Mty';
+      const locB = b.location || 'Mty';
+      if (locA !== locB) {
+        return locA.localeCompare(locB);
+      }
+      const prioA = getLabTypePriority(a.type, a.name);
+      const prioB = getLabTypePriority(b.type, b.name);
+      if (prioA !== prioB) {
+        return prioA - prioB;
+      }
+      return a.name.localeCompare(b.name);
+    });
 
   return (
     <div ref={containerRef} className="relative overflow-x-auto border border-gray-300 rounded-lg shadow-sm bg-white min-h-[500px]">
@@ -358,7 +367,45 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Comments & Description</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                  Comments & Description
+                </label>
+                {activeCommentPopup.type === 'station' && onUpdateStationComments && (
+                  <button
+                    onClick={() => {
+                      const newComm = prompt('Edit Station Comments:', activeCommentPopup.comments || '');
+                      if (newComm !== null) {
+                        onUpdateStationComments(activeCommentPopup.id, newComm.trim());
+                        setActiveCommentPopup({
+                          ...activeCommentPopup,
+                          comments: newComm.trim(),
+                        });
+                      }
+                    }}
+                    className="text-[10px] text-blue-600 hover:underline font-bold cursor-pointer"
+                  >
+                    Edit Station Comments
+                  </button>
+                )}
+                {activeCommentPopup.type === 'lab' && onUpdateLabComments && (
+                  <button
+                    onClick={() => {
+                      const newComm = prompt('Edit Lab Comments:', activeCommentPopup.comments || '');
+                      if (newComm !== null) {
+                        onUpdateLabComments(activeCommentPopup.id, newComm.trim());
+                        setActiveCommentPopup({
+                          ...activeCommentPopup,
+                          comments: newComm.trim(),
+                        });
+                      }
+                    }}
+                    className="text-[10px] text-blue-600 hover:underline font-bold cursor-pointer"
+                  >
+                    Edit Lab Comments
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-slate-700 mt-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200 whitespace-pre-wrap">
                 {activeCommentPopup.comments || 'No comments provided for this item.'}
               </p>
