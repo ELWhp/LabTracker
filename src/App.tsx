@@ -77,16 +77,29 @@ export function App() {
 
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('user@labcompany.com');
 
-  // Automatically detect user Google account email when running in Google Apps Script
+  // Automatically detect user Google account email & load shared cloud data when running in Google Apps Script
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).google?.script?.run) {
-      (window as any).google.script.run
-        .withSuccessHandler((email: string) => {
-          if (email && email.trim()) {
-            setCurrentUserEmail(email.trim());
-          }
-        })
-        .getUserEmail();
+      const gas = (window as any).google.script.run;
+
+      gas.withSuccessHandler((email: string) => {
+        if (email && email.trim()) {
+          setCurrentUserEmail(email.trim());
+        }
+      }).getUserEmail();
+
+      gas.withSuccessHandler((res: any) => {
+        if (res && res.status === 'success' && res.data) {
+          const d = res.data;
+          if (d.labs) setLabs(d.labs);
+          if (d.stations) setStations(d.stations);
+          if (d.resources) setResources(d.resources);
+          if (d.tests) setTests(d.tests);
+          if (d.testTypes) setTestTypes(d.testTypes);
+          if (d.landmarks) setLandmarks(d.landmarks);
+          if (res.historyVersions) setHistoryVersions(res.historyVersions);
+        }
+      }).getLabTrackerData();
     }
   }, []);
 
@@ -272,6 +285,27 @@ export function App() {
       note: 'Manual saved schedule revision',
       data: { labs, stations, resources, tests },
     };
+
+    const payload = {
+      labs,
+      stations,
+      resources,
+      tests,
+      testTypes,
+      landmarks,
+    };
+
+    if (typeof window !== 'undefined' && (window as any).google?.script?.run) {
+      (window as any).google.script.run
+        .withSuccessHandler((res: any) => {
+          if (res && res.status === 'success') {
+            alert('Saved to cloud successfully! All team members will see this update.');
+          } else if (res && res.status === 'lock_timeout') {
+            alert('Another team member is currently saving. Please try saving again in a moment.');
+          }
+        })
+        .saveLabTrackerData(payload, currentUserEmail, 'Manual save from UI');
+    }
 
     setHistoryVersions([newVer, ...historyVersions]);
     setHasUnsavedChanges(false);
