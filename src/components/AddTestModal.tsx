@@ -30,7 +30,7 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
 }) => {
   const [testName, setTestName] = useState('');
   const [testComments, setTestComments] = useState('');
-  const [assignedTechName, setAssignedTechName] = useState('');
+  const [assignedTechNames, setAssignedTechNames] = useState<string[]>([]);
   const [vrNumber, setVrNumber] = useState('');
   const [linkToVR, setLinkToVR] = useState('');
   const [testOwner, setTestOwner] = useState(currentUserEmail);
@@ -65,11 +65,11 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
       const anyQualifiedTech = resources.find((r) => r.capabilities.includes(labType));
 
       if (locationMatchTech) {
-        setAssignedTechName(locationMatchTech.name);
+        setAssignedTechNames([locationMatchTech.name]);
       } else if (anyQualifiedTech) {
-        setAssignedTechName(anyQualifiedTech.name);
+        setAssignedTechNames([anyQualifiedTech.name]);
       } else if (resources.length > 0) {
-        setAssignedTechName(resources[0].name);
+        setAssignedTechNames([resources[0].name]);
       }
     }
   }, [isOpen, defaultStartDate, prefilledStationId, currentUserEmail, stations, labs, resources, labType]);
@@ -129,7 +129,8 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
       id: testId,
       name: testName,
       testComments: testComments.trim() || undefined,
-      assignedTechName: assignedTechName.trim() || undefined,
+      assignedTechName: assignedTechNames.join(', ') || undefined,
+      assignedTechNames: assignedTechNames.length > 0 ? assignedTechNames : undefined,
       vrNumber: vrNumber.trim() || undefined,
       linkToVR: linkToVR.trim() || undefined,
       testOwner: testOwner.trim() || currentUserEmail,
@@ -144,7 +145,7 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
         {
           timestamp: new Date().toLocaleString(),
           updatedBy: testOwner || currentUserEmail,
-          details: `Created test schedule. Assigned Tech: ${assignedTechName || 'Auto'}`,
+          details: `Created test schedule. Assigned Tech: ${assignedTechNames.join(', ') || 'Auto'}`,
         },
       ],
     };
@@ -196,14 +197,22 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Assigned Technician (Auto-Assigned)</label>
-              <input
-                type="text"
-                placeholder="Technician Name"
-                value={assignedTechName}
-                onChange={(e) => setAssignedTechName(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-sans text-xs bg-emerald-50/50"
-              />
+              <label className="font-semibold text-slate-700 block mb-1">Assigned Technicians (Select up to 2)</label>
+              <select
+                multiple
+                value={assignedTechNames}
+                onChange={(e) => {
+                  const opts = Array.from(e.target.selectedOptions).map((o) => o.value);
+                  setAssignedTechNames(opts.slice(0, 2));
+                }}
+                className="w-full px-2 py-1 border border-slate-300 rounded-lg font-sans text-xs bg-emerald-50/50 h-16"
+              >
+                {resources.map((r) => (
+                  <option key={r.id} value={r.name}>
+                    {r.name} ({r.location || 'Mty'})
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -313,10 +322,11 @@ export const AddTestModal: React.FC<AddTestModalProps> = ({
               <label className="font-semibold text-slate-700 block mb-1">Tech Resources Req</label>
               <input
                 type="number"
-                min={1}
+                step="0.1"
+                min={0.1}
                 max={10}
                 value={resourcesNeededTotal}
-                onChange={(e) => setResourcesNeededTotal(Math.max(1, parseInt(e.target.value) || 1))}
+                onChange={(e) => setResourcesNeededTotal(parseFloat(e.target.value) || 1)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs"
               />
             </div>

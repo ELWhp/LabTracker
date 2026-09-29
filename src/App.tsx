@@ -237,6 +237,7 @@ export function App() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [selectedAllocationId, setSelectedAllocationId] = useState<string | null>(null);
+  const [selectedAllocationIds, setSelectedAllocationIds] = useState<string[]>([]);
 
   const [testToEditFromPanel, setTestToEditFromPanel] = useState<LabTest | null>(null);
 
@@ -817,8 +818,58 @@ export function App() {
               viewMode={viewMode}
               selectedLabIds={selectedLabIds}
               selectedAllocationId={selectedAllocationId}
-              onSelectAllocation={(alloc) => setSelectedAllocationId(alloc.id)}
+              selectedAllocationIds={selectedAllocationIds}
+              onSelectAllocation={(alloc, _test, isShiftKey) => {
+                if (isShiftKey) {
+                  setSelectedAllocationIds((prev) =>
+                    prev.includes(alloc.id) ? prev.filter((id) => id !== alloc.id) : [...prev, alloc.id]
+                  );
+                  setSelectedAllocationId(alloc.id);
+                } else {
+                  setSelectedAllocationIds([alloc.id]);
+                  setSelectedAllocationId(alloc.id);
+                }
+              }}
+              onClearMultiSelection={() => setSelectedAllocationIds([])}
               onUpdateAllocationDates={handleUpdateAllocationDates}
+              onBatchUpdateAllocationDates={(updates) => {
+                pushUndoState();
+                setTests((prevTests) =>
+                  prevTests.map((t) => {
+                    let modified = false;
+                    const updatedAllocations = t.unitAllocations.map((a) => {
+                      const update = updates.find((u) => u.allocationId === a.id);
+                      if (update) {
+                        modified = true;
+                        const unitDuration = calculateWorkingDaysBetween(a.startDate, a.endDate);
+                        const newEndDate = addWorkingDays(update.newStartDate, unitDuration);
+                        return {
+                          ...a,
+                          stationId: update.newStationId,
+                          startDate: update.newStartDate,
+                          endDate: newEndDate,
+                        };
+                      }
+                      return a;
+                    });
+
+                    if (!modified) return t;
+
+                    const newLog = {
+                      timestamp: new Date().toLocaleString(),
+                      updatedBy: currentUserEmail,
+                      details: `Batch moved multi-selected unit allocations.`,
+                    };
+
+                    return {
+                      ...t,
+                      unitAllocations: updatedAllocations,
+                      editHistory: [...(t.editHistory || []), newLog],
+                    };
+                  })
+                );
+                setHasUnsavedChanges(true);
+              }}
               onResizeAllocation={handleResizeAllocation}
               onDoubleClickCell={handleDoubleClickCell}
               onUpdateLandmark={(updatedLm) => {
@@ -869,6 +920,7 @@ export function App() {
         test={selectedTest}
         labs={labs}
         stations={stations}
+        allTests={tests}
         onUpdateAllocation={handleUpdateSingleAllocation}
         onEditTest={(t) => setTestToEditFromPanel(t)}
       />

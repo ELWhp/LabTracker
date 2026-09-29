@@ -83,6 +83,7 @@ export interface LabTest {
   notes?: string;
   testComments?: string;
   assignedTechName?: string;
+  assignedTechNames?: string[];
   unitAllocations: UnitAllocation[];
   testOwner?: string;
   vrNumber?: string;

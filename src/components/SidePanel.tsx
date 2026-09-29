@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { UnitAllocation, LabTest, Lab, Station } from '../types/labTracker';
-import { X, Calendar, User, FileCode, ExternalLink, Cpu, History, Edit2 } from 'lucide-react';
+import { calculateWorkingDaysBetween, addWorkingDays } from '../utils/labTrackerUtils';
+import { X, Calendar, User, FileCode, ExternalLink, Cpu, History, Edit2, AlertTriangle } from 'lucide-react';
 
 interface SidePanelProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface SidePanelProps {
   test: LabTest | null;
   labs: Lab[];
   stations: Station[];
+  allTests?: LabTest[];
   onUpdateAllocation: (updatedAllocation: UnitAllocation) => void;
   onEditTest?: (test: LabTest) => void;
 }
@@ -20,6 +22,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   test,
   labs,
   stations,
+  allTests,
   onUpdateAllocation,
   onEditTest,
 }) => {
@@ -27,6 +30,58 @@ export const SidePanel: React.FC<SidePanelProps> = ({
 
   const station = stations.find((s) => s.id === allocation.stationId);
   const lab = station ? labs.find((l) => l.id === station.labId) : null;
+
+  const currentDuration = calculateWorkingDaysBetween(allocation.startDate, allocation.endDate);
+  const [durationInput, setDurationInput] = useState<number>(currentDuration);
+  const [collisionWarning, setCollisionWarning] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDurationInput(currentDuration);
+    setCollisionWarning(null);
+  }, [allocation.id, allocation.startDate, allocation.endDate]);
+
+  const handleDurationChange = (newDays: number) => {
+    if (newDays <= 0 || isNaN(newDays)) return;
+    setDurationInput(newDays);
+
+    const calculatedEndDate = addWorkingDays(allocation.startDate, newDays);
+
+    // Collision check against other allocations on the same station
+    let hasCollision = false;
+    let collidingTestName = '';
+
+    if (allTests) {
+      for (const t of allTests) {
+        for (const a of t.unitAllocations) {
+          if (a.id === allocation.id) continue;
+          if (a.stationId === allocation.stationId) {
+            // Check overlap
+            if (allocation.startDate <= a.endDate && calculatedEndDate >= a.startDate) {
+              hasCollision = true;
+              collidingTestName = t.name;
+              break;
+            }
+          }
+        }
+        if (hasCollision) break;
+      }
+    }
+
+    if (hasCollision) {
+      setCollisionWarning(`Warning: Extending duration to ${newDays} working days (${calculatedEndDate}) collides with test "${collidingTestName}" on this station!`);
+    } else {
+      setCollisionWarning(null);
+    }
+
+    onUpdateAllocation({
+      ...allocation,
+      endDate: calculatedEndDate,
+    });
+  };
+
+  const techList = test.assignedTechNames && test.assignedTechNames.length > 0
+    ? test.assignedTechNames.join(', ')
+    : (test.assignedTechName || 'Auto-Assigned');
 
   return (
     <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-slate-200 z-[60] transform transition-transform duration-300 ease-in-out flex flex-col">
@@ -87,10 +142,10 @@ export const SidePanel: React.FC<SidePanelProps> = ({
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
           <div>
             <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider block mb-1">
-              Assigned Technician
+              Assigned Technician(s)
             </span>
-            <span className="font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded text-xs">
-              {test.assignedTechName || 'Auto-Assigned'}
+            <span className="font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded text-xs inline-block">
+              {techList}
             </span>
           </div>
 
@@ -164,17 +219,37 @@ export const SidePanel: React.FC<SidePanelProps> = ({
         {/* Unit Date Configuration */}
         <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5">
           <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px] flex items-center gap-1">
-            <Calendar className="h-3.5 w-3.5 text-blue-500" /> Schedule Unit Dates
+            <Calendar className="h-3.5 w-3.5 text-blue-500" /> Schedule Unit Duration & Dates
           </div>
+
+          <div>
+            <label className="font-semibold text-slate-600 block mb-1">Duration (Working Days):</label>
+            <input
+              type="number"
+              min="1"
+              value={durationInput}
+              onChange={(e) => handleDurationChange(parseInt(e.target.value) || 1)}
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono text-xs bg-white font-bold text-blue-900"
+            />
+          </div>
+
+          {collisionWarning && (
+            <div className="p-2 bg-amber-50 border border-amber-300 rounded text-amber-800 text-[11px] flex items-start gap-1.5 font-medium">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>{collisionWarning}</span>
+            </div>
+          )}
 
           <div>
             <label className="font-semibold text-slate-600 block mb-1">Start Date:</label>
             <input
               type="date"
               value={allocation.startDate}
-              onChange={(e) =>
-                onUpdateAllocation({ ...allocation, startDate: e.target.value })
-              }
+              onChange={(e) => {
+                const newStart = e.target.value;
+                const newEnd = addWorkingDays(newStart, durationInput);
+                onUpdateAllocation({ ...allocation, startDate: newStart, endDate: newEnd });
+              }}
               className="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono text-xs bg-white"
             />
           </div>

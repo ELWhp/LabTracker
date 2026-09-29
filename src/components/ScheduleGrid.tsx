@@ -8,7 +8,7 @@ import type {
   Landmark,
 } from '../types/labTracker';
 import { LAB_TYPE_LABELS } from '../types/labTracker';
-import { addWorkingDays, addDays, calculateWorkingDaysBetween } from '../utils/labTrackerUtils';
+import { addWorkingDays, addDays, calculateWorkingDaysBetween, parseYYYYMMDD, formatYYYYMMDD } from '../utils/labTrackerUtils';
 import { Info, Cpu, FileText } from 'lucide-react';
 
 interface ScheduleGridProps {
@@ -21,11 +21,14 @@ interface ScheduleGridProps {
   selectedLabIds?: string[];
   selectedLabId?: string;
   selectedAllocationId: string | null;
-  onSelectAllocation: (allocation: UnitAllocation, test: LabTest) => void;
+  onSelectAllocation: (allocation: UnitAllocation, test: LabTest, isShiftKey?: boolean) => void;
   onUpdateAllocationDates: (
     allocationId: string,
     newStationId: string,
     newStartDate: string
+  ) => void;
+  onBatchUpdateAllocationDates?: (
+    updates: { allocationId: string; newStationId: string; newStartDate: string }[]
   ) => void;
   onResizeAllocation?: (
     allocationId: string,
@@ -36,6 +39,8 @@ interface ScheduleGridProps {
   onUpdateLandmark?: (landmark: Landmark) => void;
   onUpdateStationComments?: (stationId: string, comments: string) => void;
   onUpdateLabComments?: (labId: string, comments: string) => void;
+  selectedAllocationIds?: string[];
+  onClearMultiSelection?: () => void;
 }
 
 interface DisplayColumn {
@@ -64,11 +69,14 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
   selectedAllocationId,
   onSelectAllocation,
   onUpdateAllocationDates,
+  onBatchUpdateAllocationDates,
   onResizeAllocation,
   onDoubleClickCell,
   onUpdateLandmark,
   onUpdateStationComments,
   onUpdateLabComments,
+  selectedAllocationIds = [],
+  onClearMultiSelection,
 }) => {
   const testMap = new Map<string, LabTest>(tests.map((t) => [t.id, t]));
 
@@ -286,6 +294,80 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       const draggedAlloc: UnitAllocation = parsed;
       if (!draggedAlloc || !draggedAlloc.id) return;
 
+      // Check if dragging a multi-selection of slabs
+      const isMulti = selectedAllocationIds.includes(draggedAlloc.id) && selectedAllocationIds.length > 1;
+
+      if (isMulti && onBatchUpdateAllocationDates) {
+        // Collect all selected allocations
+        const selectedAllocs: { alloc: UnitAllocation; test: LabTest; stationIndex: number }[] = [];
+        tests.forEach((t) => {
+          t.unitAllocations.forEach((a) => {
+            if (selectedAllocationIds.includes(a.id)) {
+              selectedAllocs.push({ alloc: a, test: t, stationIndex: 0 });
+            }
+          });
+        });
+
+        // Compute station order based on sorted stations list
+        const stationOrder = stations.map((s) => s.id);
+        const draggedStationIdx = stationOrder.indexOf(draggedAlloc.stationId);
+        const targetStationIdx = stationOrder.indexOf(targetStationId);
+        const stationOffset = targetStationIdx - draggedStationIdx;
+
+        // Compute working day offset relative to dragged allocation's start date
+        const dateOffsetDays = (parseYYYYMMDD(targetDateStr).getTime() - parseYYYYMMDD(draggedAlloc.startDate).getTime()) / 86400000;
+
+        // Calculate prospective new placements for ALL selected slabs
+        const updates: { allocationId: string; newStationId: string; newStartDate: string; newEndDate: string }[] = [];
+        let canFit = true;
+
+        for (const { alloc } of selectedAllocs) {
+          const currStationIdx = stationOrder.indexOf(alloc.stationId);
+          const newStationIdx = currStationIdx + stationOffset;
+
+          if (newStationIdx < 0 || newStationIdx >= stationOrder.length) {
+            canFit = false;
+            break;
+          }
+
+          const newStationId = stationOrder[newStationIdx];
+          const currStartObj = parseYYYYMMDD(alloc.startDate);
+          currStartObj.setDate(currStartObj.getDate() + dateOffsetDays);
+          const newStartDate = formatYYYYMMDD(currStartObj);
+          const dur = calculateWorkingDaysBetween(alloc.startDate, alloc.endDate);
+          const newEndDate = addWorkingDays(newStartDate, dur);
+
+          // Check collisions with non-selected slabs on the destination station
+          const stationAllocs = allocationsByStation.get(newStationId) || [];
+          const hasCollision = stationAllocs.some(({ alloc: existingAlloc }) => {
+            if (selectedAllocationIds.includes(existingAlloc.id)) return false; // ignore collisions with other moving selected slabs
+            return newStartDate <= existingAlloc.endDate && newEndDate >= existingAlloc.startDate;
+          });
+
+          if (hasCollision) {
+            canFit = false;
+            break;
+          }
+
+          updates.push({ allocationId: alloc.id, newStationId, newStartDate, newEndDate });
+        }
+
+        if (!canFit) {
+          alert('Cannot move multi-selection: One or more selected test slabs collide or do not fit in the target stations/dates!');
+          return;
+        }
+
+        onBatchUpdateAllocationDates(
+          updates.map((u) => ({
+            allocationId: u.allocationId,
+            newStationId: u.newStationId,
+            newStartDate: u.newStartDate,
+          }))
+        );
+        return;
+      }
+
+      // Single slab drop handling
       const test = testMap.get(draggedAlloc.testId);
       if (!test) return;
 
@@ -365,7 +447,13 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     });
 
   return (
-    <div ref={containerRef} className="relative overflow-x-auto border border-gray-300 rounded-lg shadow-sm bg-white min-h-[500px]">
+    <div
+      ref={containerRef}
+      onClick={() => {
+        if (onClearMultiSelection) onClearMultiSelection();
+      }}
+      className="relative overflow-x-auto border border-gray-300 rounded-lg shadow-sm bg-white min-h-[500px]"
+    >
       {/* Floating Comment Popup Modal */}
       {activeCommentPopup && (
         <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center p-4" onClick={() => setActiveCommentPopup(null)}>
@@ -750,12 +838,15 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                                   draggable
                                   onDragStart={(e) => handleDragStart(e, alloc)}
                                   onDragEnd={handleDragEnd}
-                                  onClick={() => onSelectAllocation(alloc, test)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onSelectAllocation(alloc, test, e.shiftKey);
+                                  }}
                                   style={{ backgroundColor: test.status === 'completed' ? '#94a3b8' : test.color || '#2563eb' }}
                                   className={`h-full min-h-[22px] w-full rounded px-1 text-white font-medium flex items-center justify-between cursor-grab active:cursor-grabbing shadow-2xs transition-all hover:brightness-110 relative group z-10 ${
                                     test.status === 'completed' ? 'opacity-80' : ''
                                   } ${
-                                    isSelected ? 'ring-2 ring-black ring-offset-1 z-10' : ''
+                                    selectedAllocationIds.includes(alloc.id) ? 'ring-2 ring-amber-400 ring-offset-1 z-20 scale-[1.02]' : isSelected ? 'ring-2 ring-black ring-offset-1 z-10' : ''
                                   }`}
                                   title={`Test: ${test.name} ${test.status === 'completed' ? '(Completed)' : ''}\nVR: ${test.vrNumber || 'N/A'}\nOwner: ${test.testOwner || 'N/A'}\nUnit: ${alloc.unitIndex}/${alloc.totalUnits}\nDates: ${alloc.startDate} to ${alloc.endDate}`}
                                 >
@@ -794,9 +885,16 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                                     </div>
                                   )}
 
-                                  <span className="truncate mr-1 text-[10px] font-semibold drop-shadow-2xs pl-3.5">
-                                    {test.name}
-                                  </span>
+                                  <div className="flex flex-col min-w-0 pl-3.5 leading-none py-0.5">
+                                    <span className="truncate text-[10px] font-semibold drop-shadow-2xs">
+                                      {test.name}
+                                    </span>
+                                    <span className="text-[8px] text-white/80 font-normal truncate">
+                                      {test.assignedTechNames && test.assignedTechNames.length > 0
+                                        ? test.assignedTechNames.join(', ')
+                                        : (test.assignedTechName || '')}
+                                    </span>
+                                  </div>
 
                                   <div className="flex items-center gap-0.5 shrink-0 pr-3.5">
                                     <span className="bg-black/30 text-white font-mono text-[8px] px-1 py-0.2 rounded font-bold">
