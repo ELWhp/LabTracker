@@ -81,6 +81,14 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
               >
                 ‹ See Previous Days
               </button>
+              <button
+                type="button"
+                onClick={() => onStartDateChange(addDays(startDateStr, 14))}
+                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded text-[11px] cursor-pointer flex items-center gap-1 transition-colors"
+                title="Shift start date 14 days forward to view upcoming test schedule"
+              >
+                See Next Days ›
+              </button>
             </div>
 
             {daysCount !== undefined && onDaysCountChange && (
@@ -131,8 +139,11 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {resources.map((tech) => {
             const assignedActiveTests = activeTests.filter((t) => {
+              if (t.assignedTechNames && t.assignedTechNames.length > 0) {
+                return t.assignedTechNames.some((n) => n.toLowerCase() === tech.name.toLowerCase());
+              }
               if (t.assignedTechName) {
-                return t.assignedTechName.toLowerCase() === tech.name.toLowerCase();
+                return t.assignedTechName.toLowerCase().includes(tech.name.toLowerCase());
               }
               return t.labType && tech.capabilities.includes(t.labType);
             });
@@ -293,8 +304,11 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
           <tbody>
             {resources.map((tech) => {
               const techActiveTests = activeTests.filter((t) => {
+                if (t.assignedTechNames && t.assignedTechNames.length > 0) {
+                  return t.assignedTechNames.some((n) => n.toLowerCase() === tech.name.toLowerCase());
+                }
                 if (t.assignedTechName) {
-                  return t.assignedTechName.toLowerCase() === tech.name.toLowerCase();
+                  return t.assignedTechName.toLowerCase().includes(tech.name.toLowerCase());
                 }
                 return t.labType && tech.capabilities.includes(t.labType);
               });

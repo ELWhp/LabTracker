@@ -687,6 +687,14 @@ export function App() {
                   >
                     ‹ See Previous Days
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setStartDateStr(addDays(startDateStr, 14))}
+                    className="px-2 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded text-[11px] cursor-pointer flex items-center gap-1 transition-colors"
+                    title="Shift start date 14 days forward to view upcoming test schedule"
+                  >
+                    See Next Days ›
+                  </button>
                 </div>
 
                 <div className="flex items-center gap-2">

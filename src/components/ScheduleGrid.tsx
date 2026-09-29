@@ -556,45 +556,45 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           ))}
         </colgroup>
 
-        <thead>
+        <thead className="sticky top-0 z-40 shadow-sm bg-white">
           <tr className="bg-slate-800 text-white font-semibold text-center border-b border-slate-700">
-            <th style={col1Style} className="px-2 py-2 bg-slate-800 z-40 border-r border-slate-700 text-left">
+            <th style={col1Style} className="px-2 py-2 bg-slate-800 z-50 border-r border-slate-700 text-left">
               Timeline / Year
             </th>
-            <th style={col2Style} className="px-2 py-2 bg-slate-800 z-40 border-r border-slate-700 text-left" />
+            <th style={col2Style} className="px-2 py-2 bg-slate-800 z-50 border-r border-slate-700 text-left" />
             {yearSpans.map((y, idx) => (
-              <th key={idx} colSpan={y.colSpan} className="px-0.5 py-1 border-r border-slate-700 font-bold relative">
+              <th key={idx} colSpan={y.colSpan} className="px-0.5 py-1 border-r border-slate-700 font-bold relative bg-slate-800">
                 {y.year}
               </th>
             ))}
           </tr>
 
           <tr className="bg-slate-700 text-white font-medium text-center border-b border-slate-600">
-            <th style={col1Style} className="px-2 py-1.5 bg-slate-700 z-40 border-r border-slate-600 text-left">
+            <th style={col1Style} className="px-2 py-1.5 bg-slate-700 z-50 border-r border-slate-600 text-left">
               Month
             </th>
-            <th style={col2Style} className="px-2 py-1.5 bg-slate-700 z-40 border-r border-slate-600 text-left" />
+            <th style={col2Style} className="px-2 py-1.5 bg-slate-700 z-50 border-r border-slate-600 text-left" />
             {monthSpans.map((m, idx) => (
-              <th key={idx} colSpan={m.colSpan} className="px-0.5 py-1 border-r border-slate-600 text-[11px] font-semibold">
+              <th key={idx} colSpan={m.colSpan} className="px-0.5 py-1 border-r border-slate-600 text-[11px] font-semibold bg-slate-700">
                 {m.monthName}
               </th>
             ))}
           </tr>
 
           <tr className="bg-slate-600 text-slate-100 font-medium text-center border-b border-slate-500">
-            <th style={col1Style} className="px-2 py-1 bg-slate-600 z-40 border-r border-slate-500 text-left">
+            <th style={col1Style} className="px-2 py-1 bg-slate-600 z-50 border-r border-slate-500 text-left">
               Week
             </th>
-            <th style={col2Style} className="px-2 py-1 bg-slate-600 z-40 border-r border-slate-500 text-left" />
+            <th style={col2Style} className="px-2 py-1 bg-slate-600 z-50 border-r border-slate-500 text-left" />
             {weekSpans.map((w, idx) => (
-              <th key={idx} colSpan={w.colSpan} className="px-0.5 py-1 border-r border-slate-500 text-[10px]">
+              <th key={idx} colSpan={w.colSpan} className="px-0.5 py-1 border-r border-slate-500 text-[10px] bg-slate-600">
                 W{w.weekNumber}
               </th>
             ))}
           </tr>
 
           <tr className="bg-slate-100 text-slate-700 font-bold text-center border-b-2 border-slate-400">
-            <th style={col1Style} className="px-2 py-2 bg-slate-200 z-40 border-r border-slate-300 text-left relative group">
+            <th style={col1Style} className="px-2 py-2 bg-slate-200 z-50 border-r border-slate-300 text-left relative group">
               <div className="flex items-center justify-between">
                 <span className="truncate">Lab & Comments</span>
                 <span className="text-[10px] text-slate-400 font-normal shrink-0">↔</span>
@@ -606,7 +606,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
               />
             </th>
 
-            <th style={col2Style} className="px-2 py-2 bg-slate-200 z-40 border-r border-slate-300 text-left relative group">
+            <th style={col2Style} className="px-2 py-2 bg-slate-200 z-50 border-r border-slate-300 text-left relative group">
               <div className="flex items-center justify-between">
                 <span className="truncate">Station & Capabilities</span>
                 <span className="text-[10px] text-slate-400 font-normal shrink-0">↔</span>
@@ -621,10 +621,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             {displayCols.map((col) => {
               const landmarkOnCol = landmarks.find((lm) => col.dates.includes(lm.date));
               const lmOffsetPct = landmarkOnCol
-                ? viewMode === 'weeks'
-                  ? ((col.dates.indexOf(landmarkOnCol.date) + 0.5) / Math.max(1, col.dates.length)) * 100
-                  : 50
-                : 50;
+                ? (col.dates.indexOf(landmarkOnCol.date) / Math.max(1, col.dates.length)) * 100
+                : 0;
 
               return (
                 <th
@@ -822,9 +820,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                           {displayCols.slice(startIndex, startIndex + colSpan).map((colInSpan, cIdx) => {
                             const lm = landmarks.find((l) => colInSpan.dates.includes(l.date));
                             if (!lm) return null;
-                            const colFraction = viewMode === 'weeks'
-                              ? (colInSpan.dates.indexOf(lm.date) + 0.5) / Math.max(1, colInSpan.dates.length)
-                              : 0.5;
+                            const colFraction = colInSpan.dates.indexOf(lm.date) / Math.max(1, colInSpan.dates.length);
                             const pct = ((cIdx + colFraction) / colSpan) * 100;
                             return (
                               <div
@@ -975,9 +971,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                       >
                         {/* Vertical Landmark Launch Line */}
                         {landmarkOnCol && (() => {
-                          const colFraction = viewMode === 'weeks'
-                            ? (col.dates.indexOf(landmarkOnCol.date) + 0.5) / Math.max(1, col.dates.length)
-                            : 0.5;
+                          const colFraction = col.dates.indexOf(landmarkOnCol.date) / Math.max(1, col.dates.length);
                           return (
                             <div
                               style={{ left: `${colFraction * 100}%` }}
