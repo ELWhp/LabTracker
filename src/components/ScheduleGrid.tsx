@@ -239,6 +239,23 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     allocation: UnitAllocation
   ) => {
     e.dataTransfer.setData('text/plain', JSON.stringify(allocation));
+    e.dataTransfer.effectAllowed = 'move';
+
+    // Set drag image anchor at left edge (1st day position) of the element
+    if (e.currentTarget) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      e.dataTransfer.setDragImage(e.currentTarget, 0, rect.height / 2);
+    }
+
+    // Make element translucent while dragging
+    const elem = e.currentTarget;
+    setTimeout(() => {
+      if (elem) elem.style.opacity = '0.35';
+    }, 0);
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.style.opacity = '1';
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLTableCellElement>) => {
@@ -428,7 +445,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
         </div>
       )}
 
-      <table className="w-full border-collapse text-xs select-none">
+      <table className="w-full border-collapse text-xs select-none table-fixed">
         <colgroup>
           <col style={{ width: `${labColWidth}px`, minWidth: `${labColWidth}px` }} />
           <col style={{ width: `${stationColWidth}px`, minWidth: `${stationColWidth}px` }} />
@@ -705,6 +722,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                                   key={alloc.id}
                                   draggable
                                   onDragStart={(e) => handleDragStart(e, alloc)}
+                                  onDragEnd={handleDragEnd}
                                   onClick={() => onSelectAllocation(alloc, test)}
                                   style={{ backgroundColor: test.status === 'completed' ? '#94a3b8' : test.color || '#2563eb' }}
                                   className={`h-full min-h-[22px] w-full rounded px-1 text-white font-medium flex items-center justify-between cursor-grab active:cursor-grabbing shadow-2xs transition-all hover:brightness-110 relative group z-10 ${
@@ -714,53 +732,83 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                                   }`}
                                   title={`Test: ${test.name} ${test.status === 'completed' ? '(Completed)' : ''}\nVR: ${test.vrNumber || 'N/A'}\nOwner: ${test.testOwner || 'N/A'}\nUnit: ${alloc.unitIndex}/${alloc.totalUnits}\nDates: ${alloc.startDate} to ${alloc.endDate}`}
                                 >
-                                  {/* Left Resize Handle (Draggable & Clickable) */}
+                                  {/* Left Resize Handle (Click +/- or drag handle) */}
                                   {onResizeAllocation && (
                                     <div
-                                      draggable
-                                      onDragStart={(e) => {
-                                        e.stopPropagation();
-                                        e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'resize', allocationId: alloc.id, edge: 'start' }));
-                                      }}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const prevDate = addDays(alloc.startDate, -1);
-                                        onResizeAllocation(alloc.id, 'start', prevDate);
-                                      }}
-                                      className="absolute left-0 top-0 bottom-0 w-2.5 bg-black/30 hover:bg-black/60 rounded-l cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[9px] select-none z-20"
-                                      title="Drag edge or click to expand/shrink start date"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="absolute left-0 top-0 bottom-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity z-20"
                                     >
-                                      ‹
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const prevDate = addDays(alloc.startDate, -1);
+                                          onResizeAllocation(alloc.id, 'start', prevDate);
+                                        }}
+                                        className="h-full px-0.5 bg-black/50 hover:bg-black/80 text-white font-bold text-[9px] rounded-l flex items-center justify-center cursor-pointer"
+                                        title="Expand start date (1 day earlier)"
+                                      >
+                                        +
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const nextDate = addDays(alloc.startDate, 1);
+                                          if (nextDate <= alloc.endDate) {
+                                            onResizeAllocation(alloc.id, 'start', nextDate);
+                                          }
+                                        }}
+                                        className="h-full px-0.5 bg-black/50 hover:bg-black/80 text-white font-bold text-[9px] flex items-center justify-center cursor-pointer border-l border-white/20"
+                                        title="Shrink start date (1 day later)"
+                                      >
+                                        -
+                                      </button>
                                     </div>
                                   )}
 
-                                  <span className="truncate mr-1 text-[10px] font-semibold drop-shadow-2xs pl-0.5">
+                                  <span className="truncate mr-1 text-[10px] font-semibold drop-shadow-2xs pl-3.5">
                                     {test.name}
                                   </span>
 
-                                  <div className="flex items-center gap-0.5 shrink-0">
+                                  <div className="flex items-center gap-0.5 shrink-0 pr-3.5">
                                     <span className="bg-black/30 text-white font-mono text-[8px] px-1 py-0.2 rounded font-bold">
                                       {alloc.unitIndex}/{alloc.totalUnits}
                                     </span>
                                   </div>
 
-                                  {/* Right Resize Handle (Draggable & Clickable) */}
+                                  {/* Right Resize Handle (Click +/- or drag handle) */}
                                   {onResizeAllocation && (
                                     <div
-                                      draggable
-                                      onDragStart={(e) => {
-                                        e.stopPropagation();
-                                        e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'resize', allocationId: alloc.id, edge: 'end' }));
-                                      }}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const nextDate = addDays(alloc.endDate, 1);
-                                        onResizeAllocation(alloc.id, 'end', nextDate);
-                                      }}
-                                      className="absolute right-0 top-0 bottom-0 w-2.5 bg-black/30 hover:bg-black/60 rounded-r cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[9px] select-none z-20"
-                                      title="Drag edge or click to expand/shrink end date"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="absolute right-0 top-0 bottom-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity z-20"
                                     >
-                                      ›
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const prevDate = addDays(alloc.endDate, -1);
+                                          if (prevDate >= alloc.startDate) {
+                                            onResizeAllocation(alloc.id, 'end', prevDate);
+                                          }
+                                        }}
+                                        className="h-full px-0.5 bg-black/50 hover:bg-black/80 text-white font-bold text-[9px] flex items-center justify-center cursor-pointer border-r border-white/20"
+                                        title="Shrink end date (1 day earlier)"
+                                      >
+                                        -
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const nextDate = addDays(alloc.endDate, 1);
+                                          onResizeAllocation(alloc.id, 'end', nextDate);
+                                        }}
+                                        className="h-full px-0.5 bg-black/50 hover:bg-black/80 text-white font-bold text-[9px] rounded-r flex items-center justify-center cursor-pointer"
+                                        title="Expand end date (1 day later)"
+                                      >
+                                        +
+                                      </button>
                                     </div>
                                   )}
                                 </div>

@@ -167,6 +167,8 @@ export function App() {
   };
 
   const [startDateStr, setStartDateStr] = useState<string>(() => {
+    const saved = localStorage.getItem('labtracker_start_date');
+    if (saved) return saved;
     const today = new Date();
     const y = today.getFullYear();
     const m = String(today.getMonth() + 1).padStart(2, '0');
@@ -179,12 +181,29 @@ export function App() {
     return saved ? parseInt(saved, 10) || 30 : 30;
   });
 
-  const [selectedLabId, setSelectedLabId] = useState<string>('all');
+  const [selectedLabId, setSelectedLabId] = useState<string>(() => {
+    return localStorage.getItem('labtracker_selected_lab_id') || 'all';
+  });
+
+  const [viewMode, setViewMode] = useState<'days' | 'weeks'>(() => {
+    return (localStorage.getItem('labtracker_view_mode') as 'days' | 'weeks') || 'days';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('labtracker_start_date', startDateStr);
+  }, [startDateStr]);
 
   useEffect(() => {
     localStorage.setItem('labtracker_days_count', String(daysCount));
   }, [daysCount]);
-  const [viewMode, setViewMode] = useState<'days' | 'weeks'>('days');
+
+  useEffect(() => {
+    localStorage.setItem('labtracker_selected_lab_id', selectedLabId);
+  }, [selectedLabId]);
+
+  useEffect(() => {
+    localStorage.setItem('labtracker_view_mode', viewMode);
+  }, [viewMode]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [prefilledStationId, setPrefilledStationId] = useState<string | undefined>(undefined);
@@ -417,24 +436,26 @@ export function App() {
           }
         }
 
-        const newDuration = calculateWorkingDaysBetween(newStartDate, newEndDate);
+        const newUnitDuration = calculateWorkingDaysBetween(newStartDate, newEndDate);
 
-        const updatedAllocations = t.unitAllocations.map((a) => ({
-          ...a,
-          startDate: newStartDate,
-          endDate: newEndDate,
-        }));
+        // Update ONLY the specific unit allocation being resized, leaving other units untouched
+        const updatedAllocations = t.unitAllocations.map((a) => {
+          if (a.id !== allocationId) return a;
+          return {
+            ...a,
+            startDate: newStartDate,
+            endDate: newEndDate,
+          };
+        });
 
         const newLog = {
           timestamp: new Date().toLocaleString(),
           updatedBy: currentUserEmail,
-          details: `Resized test duration to ${newDuration} working days (${newStartDate} - ${newEndDate})`,
+          details: `Resized Unit ${targetAlloc.unitIndex} duration to ${newUnitDuration} working days (${newStartDate} - ${newEndDate})`,
         };
 
         return {
           ...t,
-          durationDays: newDuration,
-          startDate: newStartDate,
           unitAllocations: updatedAllocations,
           editHistory: [...(t.editHistory || []), newLog],
         };

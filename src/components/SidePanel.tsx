@@ -29,7 +29,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   const lab = station ? labs.find((l) => l.id === station.labId) : null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-slate-200 z-40 transform transition-transform duration-300 ease-in-out flex flex-col">
+    <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-slate-200 z-[60] transform transition-transform duration-300 ease-in-out flex flex-col">
       {/* Header */}
       <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
         <div className="flex items-center space-x-2">
