@@ -308,10 +308,17 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           });
         });
 
-        // Compute station order based on sorted stations list
-        const stationOrder = stations.map((s) => s.id);
-        const draggedStationIdx = stationOrder.indexOf(draggedAlloc.stationId);
-        const targetStationIdx = stationOrder.indexOf(targetStationId);
+        // Compute visual station order matching the exact top-to-bottom rendering order of sortedLabs & stations
+        const visualStationOrder: string[] = [];
+        sortedLabs.forEach((lab) => {
+          const labStations = stations
+            .filter((s) => s.labId === lab.id)
+            .sort((a, b) => a.stationNumber - b.stationNumber);
+          labStations.forEach((s) => visualStationOrder.push(s.id));
+        });
+
+        const draggedStationIdx = visualStationOrder.indexOf(draggedAlloc.stationId);
+        const targetStationIdx = visualStationOrder.indexOf(targetStationId);
         const stationOffset = targetStationIdx - draggedStationIdx;
 
         // Compute working day offset relative to dragged allocation's start date
@@ -322,15 +329,15 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
         let canFit = true;
 
         for (const { alloc } of selectedAllocs) {
-          const currStationIdx = stationOrder.indexOf(alloc.stationId);
+          const currStationIdx = visualStationOrder.indexOf(alloc.stationId);
           const newStationIdx = currStationIdx + stationOffset;
 
-          if (newStationIdx < 0 || newStationIdx >= stationOrder.length) {
+          if (newStationIdx < 0 || newStationIdx >= visualStationOrder.length) {
             canFit = false;
             break;
           }
 
-          const newStationId = stationOrder[newStationIdx];
+          const newStationId = visualStationOrder[newStationIdx];
           const currStartObj = parseYYYYMMDD(alloc.startDate);
           currStartObj.setDate(currStartObj.getDate() + dateOffsetDays);
           const newStartDate = formatYYYYMMDD(currStartObj);
@@ -614,8 +621,10 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             {displayCols.map((col) => {
               const landmarkOnCol = landmarks.find((lm) => col.dates.includes(lm.date));
               const lmOffsetPct = landmarkOnCol
-                ? (col.dates.indexOf(landmarkOnCol.date) / Math.max(1, col.dates.length)) * 100
-                : 0;
+                ? viewMode === 'weeks'
+                  ? ((col.dates.indexOf(landmarkOnCol.date) + 0.5) / Math.max(1, col.dates.length)) * 100
+                  : 50
+                : 50;
 
               return (
                 <th
@@ -665,17 +674,15 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                             }
                           }
                         }}
-                        style={{ left: viewMode === 'weeks' ? `${lmOffsetPct}%` : '50%' }}
+                        style={{ left: `${lmOffsetPct}%` }}
                         className="absolute -top-3 -translate-x-1/2 bg-red-600 hover:bg-red-700 text-white text-[8px] font-bold px-1 py-0.2 rounded shadow-md whitespace-nowrap z-50 cursor-pointer active:cursor-grabbing select-none"
                         title="Click to rename landmark, drag to change date"
                       >
                         {landmarkOnCol.name}
                       </div>
                       <div
-                        style={{ left: viewMode === 'weeks' ? `${lmOffsetPct}%` : 'auto' }}
-                        className={`absolute top-0 bottom-0 w-1 bg-red-600 z-30 pointer-events-none ${
-                          viewMode === 'days' ? 'right-0' : ''
-                        }`}
+                        style={{ left: `${lmOffsetPct}%` }}
+                        className="absolute top-0 bottom-0 w-1 bg-red-600 z-30 pointer-events-none -translate-x-1/2 shadow-sm"
                       />
                     </>
                   )}
@@ -816,8 +823,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                             const lm = landmarks.find((l) => colInSpan.dates.includes(l.date));
                             if (!lm) return null;
                             const colFraction = viewMode === 'weeks'
-                              ? (colInSpan.dates.indexOf(lm.date) / Math.max(1, colInSpan.dates.length))
-                              : 1.0;
+                              ? (colInSpan.dates.indexOf(lm.date) + 0.5) / Math.max(1, colInSpan.dates.length)
+                              : 0.5;
                             const pct = ((cIdx + colFraction) / colSpan) * 100;
                             return (
                               <div
@@ -969,8 +976,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                         {/* Vertical Landmark Launch Line */}
                         {landmarkOnCol && (() => {
                           const colFraction = viewMode === 'weeks'
-                            ? (col.dates.indexOf(landmarkOnCol.date) / Math.max(1, col.dates.length))
-                            : 1.0;
+                            ? (col.dates.indexOf(landmarkOnCol.date) + 0.5) / Math.max(1, col.dates.length)
+                            : 0.5;
                           return (
                             <div
                               style={{ left: `${colFraction * 100}%` }}
