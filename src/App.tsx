@@ -13,6 +13,7 @@ import {
   generateCalendarDays,
   evaluateResourceAllocations,
   evaluateLocationMismatches,
+  addDays,
   addWorkingDays,
   calculateWorkingDaysBetween,
 } from './utils/labTrackerUtils';
@@ -194,9 +195,19 @@ export function App() {
     return saved ? parseInt(saved, 10) || 30 : 30;
   });
 
-  const [selectedLabId, setSelectedLabId] = useState<string>(() => {
-    return localStorage.getItem('labtracker_selected_lab_id') || 'all';
+  const [selectedLabIds, setSelectedLabIds] = useState<string[]>(() => {
+    const saved = localStorage.getItem('labtracker_selected_lab_ids');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        /* fallback */
+      }
+    }
+    return labs.map((l) => l.id);
   });
+
+  const [isLabFilterOpen, setIsLabFilterOpen] = useState<boolean>(false);
 
   const [viewMode, setViewMode] = useState<'days' | 'weeks'>(() => {
     return (localStorage.getItem('labtracker_view_mode') as 'days' | 'weeks') || 'days';
@@ -211,8 +222,8 @@ export function App() {
   }, [daysCount]);
 
   useEffect(() => {
-    localStorage.setItem('labtracker_selected_lab_id', selectedLabId);
-  }, [selectedLabId]);
+    localStorage.setItem('labtracker_selected_lab_ids', JSON.stringify(selectedLabIds));
+  }, [selectedLabIds]);
 
   useEffect(() => {
     localStorage.setItem('labtracker_view_mode', viewMode);
@@ -667,6 +678,14 @@ export function App() {
                     onChange={(e) => setStartDateStr(e.target.value)}
                     className="px-2.5 py-1 border border-slate-300 rounded text-xs font-mono"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setStartDateStr(addDays(startDateStr, -14))}
+                    className="px-2 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded text-[11px] cursor-pointer flex items-center gap-1 transition-colors"
+                    title="Shift start date 14 days earlier to view historical test schedule"
+                  >
+                    ‹ See Previous Days
+                  </button>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -685,20 +704,81 @@ export function App() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <label className="font-semibold text-slate-700">Filter by Lab:</label>
-                  <select
-                    value={selectedLabId}
-                    onChange={(e) => setSelectedLabId(e.target.value)}
-                    className="px-2.5 py-1 border border-slate-300 rounded text-xs bg-white font-semibold text-slate-800"
+                <div className="relative flex items-center gap-2">
+                  <label className="font-semibold text-slate-700">Filter Labs:</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsLabFilterOpen(!isLabFilterOpen)}
+                    className="px-2.5 py-1 border border-slate-300 rounded text-xs bg-white font-semibold text-slate-800 flex items-center gap-1.5 cursor-pointer shadow-2xs hover:bg-slate-50"
                   >
-                    <option value="all">All Labs ({labs.length})</option>
-                    {labs.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
+                    <span>
+                      {selectedLabIds.length === labs.length
+                        ? `All Labs (${labs.length})`
+                        : `${selectedLabIds.length} of ${labs.length} Labs`}
+                    </span>
+                    <span className="text-[10px] text-slate-400">▼</span>
+                  </button>
+
+                  {/* Multi-select Popover Dropdown */}
+                  {isLabFilterOpen && (
+                    <div className="absolute top-full left-16 mt-1 w-64 bg-white border border-slate-300 rounded-lg shadow-xl z-50 p-2 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between border-b pb-1">
+                        <span className="font-bold text-slate-800">Select Labs</span>
+                        <div className="flex gap-2 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLabIds(labs.map((l) => l.id))}
+                            className="text-blue-600 hover:underline font-bold cursor-pointer"
+                          >
+                            All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLabIds([])}
+                            className="text-red-500 hover:underline font-bold cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="max-h-48 overflow-y-auto space-y-1">
+                        {labs.map((lab) => {
+                          const isChecked = selectedLabIds.includes(lab.id);
+                          return (
+                            <label
+                              key={lab.id}
+                              className="flex items-center gap-2 p-1 hover:bg-slate-50 rounded cursor-pointer text-slate-700"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (isChecked) {
+                                    setSelectedLabIds(selectedLabIds.filter((id) => id !== lab.id));
+                                  } else {
+                                    setSelectedLabIds([...selectedLabIds, lab.id]);
+                                  }
+                                }}
+                                className="rounded text-blue-600 cursor-pointer"
+                              />
+                              <span className="truncate font-medium">{lab.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+
+                      <div className="border-t pt-1 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setIsLabFilterOpen(false)}
+                          className="px-2 py-0.5 bg-blue-600 text-white font-bold rounded text-[10px] hover:bg-blue-500 cursor-pointer"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded border border-slate-200">
@@ -735,7 +815,7 @@ export function App() {
               landmarks={landmarks}
               calendarDays={calendarDays}
               viewMode={viewMode}
-              selectedLabId={selectedLabId}
+              selectedLabIds={selectedLabIds}
               selectedAllocationId={selectedAllocationId}
               onSelectAllocation={(alloc) => setSelectedAllocationId(alloc.id)}
               onUpdateAllocationDates={handleUpdateAllocationDates}

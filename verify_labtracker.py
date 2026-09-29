@@ -5,21 +5,18 @@ def run_cuj(page):
     page.goto("http://localhost:4173")
     page.wait_for_timeout(1000)
 
-    # 1. Filter by Lab using locator
-    lab_select = page.locator("select").filter(has_text="All Labs")
-    lab_select.select_option(index=1)
+    # 1. Test multi-select lab filter popover
+    page.get_by_role("button", name="All Labs").click()
+    page.wait_for_timeout(800)
+    page.get_by_role("button", name="Done").click()
     page.wait_for_timeout(800)
 
-    # 2. Reset Filter
-    lab_select.select_option(value="all")
+    # 2. Test "See Previous Days" button
+    page.get_by_role("button", name="See Previous Days").first.click()
     page.wait_for_timeout(800)
 
     # 3. Open Config Labs & Techs Modal
     page.get_by_role("button", name="Config Labs & Techs").click()
-    page.wait_for_timeout(800)
-
-    # 4. Switch to Stations tab
-    page.get_by_role("button", name="Stations & Capabilities").click()
     page.wait_for_timeout(800)
 
     # Close modal

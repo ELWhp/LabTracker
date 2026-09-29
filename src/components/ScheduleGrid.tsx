@@ -18,6 +18,7 @@ interface ScheduleGridProps {
   landmarks?: Landmark[];
   calendarDays: CalendarDay[];
   viewMode?: 'days' | 'weeks';
+  selectedLabIds?: string[];
   selectedLabId?: string;
   selectedAllocationId: string | null;
   onSelectAllocation: (allocation: UnitAllocation, test: LabTest) => void;
@@ -58,6 +59,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
   landmarks = [],
   calendarDays,
   viewMode = 'days',
+  selectedLabIds,
   selectedLabId = 'all',
   selectedAllocationId,
   onSelectAllocation,
@@ -342,7 +344,12 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 
   // Filter and sort Labs hierarchically: 1. By Location, 2. Washers First (Energy then Performance), then Dryers, 3. By Lab Name
   const sortedLabs = [...labs]
-    .filter((l) => selectedLabId === 'all' || l.id === selectedLabId)
+    .filter((l) => {
+      if (selectedLabIds && selectedLabIds.length > 0) {
+        return selectedLabIds.includes(l.id);
+      }
+      return selectedLabId === 'all' || l.id === selectedLabId;
+    })
     .sort((a, b) => {
       const locA = a.location || 'Mty';
       const locB = b.location || 'Mty';
@@ -518,6 +525,10 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 
             {displayCols.map((col) => {
               const landmarkOnCol = landmarks.find((lm) => col.dates.includes(lm.date));
+              const lmOffsetPct = landmarkOnCol
+                ? (col.dates.indexOf(landmarkOnCol.date) / Math.max(1, col.dates.length)) * 100
+                : 0;
+
               return (
                 <th
                   key={col.id}
@@ -566,12 +577,18 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                             }
                           }
                         }}
-                        className="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-600 hover:bg-red-700 text-white text-[8px] font-bold px-1 py-0.2 rounded shadow-md whitespace-nowrap z-50 cursor-pointer active:cursor-grabbing select-none"
+                        style={{ left: viewMode === 'weeks' ? `${lmOffsetPct}%` : '50%' }}
+                        className="absolute -top-3 -translate-x-1/2 bg-red-600 hover:bg-red-700 text-white text-[8px] font-bold px-1 py-0.2 rounded shadow-md whitespace-nowrap z-50 cursor-pointer active:cursor-grabbing select-none"
                         title="Click to rename landmark, drag to change date"
                       >
                         {landmarkOnCol.name}
                       </div>
-                      <div className="absolute top-0 bottom-0 right-0 w-1 bg-red-600 z-20 pointer-events-none" />
+                      <div
+                        style={{ left: viewMode === 'weeks' ? `${lmOffsetPct}%` : 'auto' }}
+                        className={`absolute top-0 bottom-0 w-1 bg-red-600 z-30 pointer-events-none ${
+                          viewMode === 'days' ? 'right-0' : ''
+                        }`}
+                      />
                     </>
                   )}
                   <div>{col.label}</div>
@@ -706,13 +723,23 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                           onDrop={(e) => handleDrop(e, station.id, col.startDate)}
                           className="p-0.5 border-r border-slate-200 align-middle relative h-12"
                         >
-                          {/* Vertical Landmark Launch Line */}
-                          {landmarkOnCol && (
-                            <div
-                              className="absolute top-0 bottom-0 right-0 w-1 bg-red-600 z-20 pointer-events-none shadow-sm"
-                              title={`Landmark: ${landmarkOnCol.name} (${landmarkOnCol.date})`}
-                            />
-                          )}
+                          {/* Vertical Landmark Launch Lines inside spanned cell */}
+                          {displayCols.slice(startIndex, startIndex + colSpan).map((colInSpan, cIdx) => {
+                            const lm = landmarks.find((l) => colInSpan.dates.includes(l.date));
+                            if (!lm) return null;
+                            const colFraction = viewMode === 'weeks'
+                              ? (colInSpan.dates.indexOf(lm.date) / Math.max(1, colInSpan.dates.length))
+                              : 1.0;
+                            const pct = ((cIdx + colFraction) / colSpan) * 100;
+                            return (
+                              <div
+                                key={lm.id}
+                                style={{ left: `${pct}%` }}
+                                className="absolute top-0 bottom-0 w-1 bg-red-600 z-30 pointer-events-none shadow-sm -translate-x-1/2"
+                                title={`Landmark: ${lm.name} (${lm.date})`}
+                              />
+                            );
+                          })}
 
                           <div className="flex flex-col gap-0.5 h-full w-full justify-center">
                             {allocsStartingHere.map(({ alloc, test }) => {
@@ -842,12 +869,18 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                         title="Double-click to add test starting on this date"
                       >
                         {/* Vertical Landmark Launch Line */}
-                        {landmarkOnCol && (
-                          <div
-                            className="absolute top-0 bottom-0 right-0 w-1 bg-red-600 z-20 pointer-events-none shadow-sm"
-                            title={`Landmark: ${landmarkOnCol.name} (${landmarkOnCol.date})`}
-                          />
-                        )}
+                        {landmarkOnCol && (() => {
+                          const colFraction = viewMode === 'weeks'
+                            ? (col.dates.indexOf(landmarkOnCol.date) / Math.max(1, col.dates.length))
+                            : 1.0;
+                          return (
+                            <div
+                              style={{ left: `${colFraction * 100}%` }}
+                              className="absolute top-0 bottom-0 w-1 bg-red-600 z-30 pointer-events-none shadow-sm -translate-x-1/2"
+                              title={`Landmark: ${landmarkOnCol.name} (${landmarkOnCol.date})`}
+                            />
+                          );
+                        })()}
                       </td>
                     );
                   })}

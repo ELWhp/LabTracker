@@ -1,6 +1,7 @@
 import React from 'react';
 import type { PersonnelResource, LabTest, CalendarDay, TestTypeConfig } from '../types/labTracker';
 import { LAB_TYPE_LABELS } from '../types/labTracker';
+import { addDays } from '../utils/labTrackerUtils';
 import { Users, Calendar as CalendarIcon, Award } from 'lucide-react';
 
 interface TechWorkloadViewProps {
@@ -72,6 +73,14 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
                 onChange={(e) => onStartDateChange(e.target.value)}
                 className="px-2.5 py-1 border border-slate-300 rounded text-xs font-mono"
               />
+              <button
+                type="button"
+                onClick={() => onStartDateChange(addDays(startDateStr, -14))}
+                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded text-[11px] cursor-pointer flex items-center gap-1 transition-colors"
+                title="Shift start date 14 days earlier to view historical test schedule"
+              >
+                ‹ See Previous Days
+              </button>
             </div>
 
             {daysCount !== undefined && onDaysCountChange && (
@@ -290,18 +299,42 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
                 return t.labType && tech.capabilities.includes(t.labType);
               });
 
-              const lanes = techActiveTests.length > 0 ? techActiveTests : [null];
+              // Interval scheduling / greedy packing into simultaneous lanes
+              const sortedTechTests = [...techActiveTests].sort((a, b) => a.startDate.localeCompare(b.startDate));
+              const packedLanes: LabTest[][] = [];
 
-              return lanes.map((testItem, laneIdx) => (
+              sortedTechTests.forEach((test) => {
+                let placedInExistingLane = false;
+                for (const lane of packedLanes) {
+                  const lastTestInLane = lane[lane.length - 1];
+                  const lastAlloc = lastTestInLane.unitAllocations[0];
+                  const lastEnd = lastAlloc ? lastAlloc.endDate : lastTestInLane.startDate;
+
+                  // If test starts after previous test in lane ends, place it in the same lane
+                  if (test.startDate > lastEnd) {
+                    lane.push(test);
+                    placedInExistingLane = true;
+                    break;
+                  }
+                }
+
+                if (!placedInExistingLane) {
+                  packedLanes.push([test]);
+                }
+              });
+
+              const finalLanes = packedLanes.length > 0 ? packedLanes : [[]];
+
+              return finalLanes.map((laneTests, laneIdx) => (
                 <tr key={`${tech.id}-lane-${laneIdx}`} className="border-b border-slate-200">
                   {laneIdx === 0 && (
                     <td
-                      rowSpan={lanes.length}
+                      rowSpan={finalLanes.length}
                       className="px-3 py-2 font-bold text-slate-800 sticky left-0 bg-slate-100 z-10 border-r border-slate-300 align-top"
                     >
                       <div>{tech.name}</div>
                       <span className="text-[10px] text-slate-500 font-mono font-normal block">
-                        {lanes.length > 1 ? `${lanes.length} Concurrent Lanes` : '1 Test Lane'}
+                        {finalLanes.length > 1 ? `${finalLanes.length} Simultaneous Lanes` : '1 Workload Lane'}
                       </span>
                     </td>
                   )}
@@ -324,23 +357,25 @@ export const TechWorkloadView: React.FC<TechWorkloadViewProps> = ({
                       return <td key={day.dateStr} className="bg-slate-100 border-r border-slate-200" />;
                     }
 
-                    if (testItem) {
-                      const testAlloc = testItem.unitAllocations[0];
-                      const endDate = testAlloc ? testAlloc.endDate : testItem.startDate;
-                      const isActiveOnDay = day.dateStr >= testItem.startDate && day.dateStr <= endDate;
+                    const activeTestInLane = laneTests.find((t) => {
+                      const alloc = t.unitAllocations[0];
+                      const endDate = alloc ? alloc.endDate : t.startDate;
+                      return day.dateStr >= t.startDate && day.dateStr <= endDate;
+                    });
 
-                      if (isActiveOnDay) {
-                        return (
-                          <td
-                            key={day.dateStr}
-                            style={{ backgroundColor: testItem.color || '#2563eb' }}
-                            className="text-white text-center text-[9px] font-bold border-r border-slate-200 truncate p-0.5"
-                            title={`Test: ${testItem.name}\nComments: ${testItem.testComments || 'None'}\nDates: ${testItem.startDate} to ${endDate}`}
-                          >
-                            <span className="truncate block">{testItem.name}</span>
-                          </td>
-                        );
-                      }
+                    if (activeTestInLane) {
+                      const alloc = activeTestInLane.unitAllocations[0];
+                      const endDate = alloc ? alloc.endDate : activeTestInLane.startDate;
+                      return (
+                        <td
+                          key={day.dateStr}
+                          style={{ backgroundColor: activeTestInLane.color || '#2563eb' }}
+                          className="text-white text-center text-[9px] font-bold border-r border-slate-200 truncate p-0.5"
+                          title={`Test: ${activeTestInLane.name}\nComments: ${activeTestInLane.testComments || 'None'}\nDates: ${activeTestInLane.startDate} to ${endDate}`}
+                        >
+                          <span className="truncate block">{activeTestInLane.name}</span>
+                        </td>
+                      );
                     }
 
                     return (
